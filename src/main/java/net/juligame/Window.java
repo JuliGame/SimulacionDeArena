@@ -109,7 +109,7 @@ public class Window {
     public static int mouseY;
 
     public long lastUnixTime = System.currentTimeMillis();
-    public int TicksPerSecond = 20;
+    public int TicksPerSecond = 60;
 
 
     private float timePerTick = 1000f / TicksPerSecond;
@@ -162,7 +162,7 @@ public class Window {
                 press(mouseX, mouseY);
             }
 
-//            System.out.println("Rendered at a ~FPS of " + (1000f / (System.currentTimeMillis() - lastFrame)));
+            System.out.println("Rendered at a ~FPS of " + (1000f / (System.currentTimeMillis() - lastFrame)));
             lastFrame = System.currentTimeMillis();
 
             if (!simThread.isAlive())
@@ -179,9 +179,9 @@ public class Window {
             for (int j = (int) -brushSize; j < brushSize; j++) {
                 float distance = (float) Math.sqrt(i * i + j * j);
                 float random = (float) Math.random() * brushSize;
-                if (random > distance) {
+
+                if (random > distance)
                     new Particle(color, x + i, y + j);
-                }
             }
         }
     }

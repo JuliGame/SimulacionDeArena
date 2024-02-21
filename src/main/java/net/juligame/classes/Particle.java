@@ -5,13 +5,10 @@ import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
 
 import java.awt.*;
-import java.util.Arrays;
-
-import static org.lwjgl.opengl.GL11.*;
 
 public class Particle {
-//    public static int TILE_SIZE = 1;
-    public static int TILE_SIZE = 6;
+    public static int TILE_SIZE = 1;
+//    public static int TILE_SIZE = 6;
     public Color color;
     public Vector2 velocity = new Vector2(0, 0);
     public float x, y;

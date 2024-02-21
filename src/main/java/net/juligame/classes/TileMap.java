@@ -2,6 +2,8 @@ package net.juligame.classes;
 
 import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
+
+import java.awt.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,17 +29,6 @@ public class TileMap {
         alreadyAddedToAddQueue = new boolean[width * height];
     }
 
-//    public void draw() {
-////        Arrays.stream(tiles).forEach(tiles -> Arrays.stream(tiles).forEach(tile -> {
-////            if (tile != null) {
-////                tile.draw();
-////            }
-////        }));
-//
-//        for (int x = 0; x < particles.size(); x++) {
-//            particles.get(x).draw();
-//        }
-//    }
     int tex;
     ByteBuffer b;
     public void initTextureAllocations(){
@@ -61,12 +52,15 @@ public class TileMap {
                     continue;
                 }
 
-                b.put(particle.r);
-                b.put(particle.g);
-                b.put(particle.b);
+                byte r = particle.r;
+                byte g = particle.g;
+                byte bl = particle.b;
+
+                b.put(r);
+                b.put(g);
+                b.put(bl);
             }
         }
-
         b.flip();
 //        glBindTexture(GL_TEXTURE_2D, tex);
 
@@ -74,6 +68,7 @@ public class TileMap {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, b);
 
+        b.clear();
 //        glClear(GL_COLOR_BUFFER_BIT);
 //        glPushMatrix();
 
@@ -94,8 +89,8 @@ public class TileMap {
     }
 
 
-    private final Queue<Particle> queuedParticlesToAdd = new java.util.LinkedList<>();
-    private final Queue<Particle> queuedParticlesToTick = new java.util.LinkedList<>();
+    private final Queue<Particle> queuedParticlesToAdd = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private final Queue<Particle> queuedParticlesToTick = new java.util.concurrent.ConcurrentLinkedQueue<>();
     public void Tick() {
         if (queueReset) {
             queueReset = false;
@@ -110,11 +105,6 @@ public class TileMap {
 //        System.out.println("Particles to tick: " + queuedParticlesToTick.size());
         while (!queuedParticlesToAdd.isEmpty()) {
             Particle particle = queuedParticlesToAdd.poll();
-            if (particle == null) {
-                System.out.println("queuedParticlesToAdd.size(): " + queuedParticlesToAdd.size());
-                System.out.println("Particle is null");
-                continue;
-            }
 
             if (tiles[(int) particle.x][(int) particle.y] != null){
                 tiles[(int) particle.x][(int) particle.y].ChangeColor(particle.color);
@@ -132,17 +122,17 @@ public class TileMap {
 
 
 //        System.out.println("Particles to tick: " + queuedParticlesToTick.size());
-        Queue<Particle> queuedParticlesToTick = new java.util.LinkedList<>(this.queuedParticlesToTick);
-        this.queuedParticlesToTick.clear();
-        alreadyAddedToTickQueue = new boolean[width * height];
-
-        while (!queuedParticlesToTick.isEmpty()) {
-            Particle particle = queuedParticlesToTick.poll();
-            if (particle == null)
-                continue;
-
-            particle.tick();
-        }
+//        Queue<Particle> queuedParticlesToTick = new java.util.LinkedList<>(this.queuedParticlesToTick);
+//        this.queuedParticlesToTick.clear();
+//        alreadyAddedToTickQueue = new boolean[width * height];
+//
+//        while (!queuedParticlesToTick.isEmpty()) {
+//            Particle particle = queuedParticlesToTick.poll();
+//            if (particle == null)
+//                continue;
+//
+//            particle.tick();
+//        }
     }
 
     private boolean[] alreadyAddedToTickQueue;
@@ -157,11 +147,6 @@ public class TileMap {
 
     private boolean[] alreadyAddedToAddQueue;
     public void AddParticleToAddQueue(Particle particle) {
-        if (particle == null) {
-            System.out.println("Particle is null");
-            return;
-        }
-
         if (alreadyAddedToAddQueue[(int) (particle.x) + ((int) particle.y * width)]) {
             return;
         }
