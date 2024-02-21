@@ -5,20 +5,24 @@ import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
 
 import java.awt.*;
+import java.util.Arrays;
 
 import static org.lwjgl.opengl.GL11.*;
 
 public class Particle {
-    public static int TILE_SIZE = 16;
+//    public static int TILE_SIZE = 1;
+    public static int TILE_SIZE = 6;
     public Color color;
     public Vector2 velocity = new Vector2(0, 0);
     public float x, y;
 
 
-    public Particle(){}
+    public Particle(){
+        id = -1;
+    }
 
     public Particle(Color color, float x, float y) {
-        this.color = color;
+        ChangeColor(color);
         this.x = x;
         this.y = y;
 
@@ -26,31 +30,27 @@ public class Particle {
             return;
         }
 
-        if (Window.tileMap.tiles[(int) x][(int) y] != null) {
-            Window.tileMap.tiles[(int) x][(int) y].color = color;
-            return;
-        }
-
-        Window.tileMap.particles.add(this);
-        Window.tileMap.tiles[(int) x][(int) y] = this;
+        Window.tileMap.AddParticleToAddQueue(this);
     }
 
-    public void draw() {
-        int x = (int) this.x;
-        int y = (int) this.y;
-
-        glColor3f(color.getRed() / 255f, color.getGreen() / 255f, color.getBlue() / 255f);
-        glBegin(GL_QUADS);
-        glVertex2f(x * TILE_SIZE, y * TILE_SIZE);
-        glVertex2f(x * TILE_SIZE + TILE_SIZE, y * TILE_SIZE);
-        glVertex2f(x * TILE_SIZE + TILE_SIZE, y * TILE_SIZE + TILE_SIZE);
-        glVertex2f(x * TILE_SIZE, y * TILE_SIZE + TILE_SIZE);
-        glEnd();
+    public byte r, g, b;
+    public void ChangeColor(Color color) {
+        this.color = color;
+        r = (byte) color.getRed();
+        g = (byte) color.getGreen();
+        b = (byte) color.getBlue();
     }
 
     public void tick() {
-        velocity.y = Math.min(velocity.y + .1f, 5);
-        velocity.y = Math.max(velocity.y, 1);
+        Particle down = getSide(Side.BOTTOM);
+//        if (down == null) {
+            velocity.y = Math.min(velocity.y + .1f, 5);
+            velocity.y = Math.max(velocity.y, 1);
+//            velocity.y = 1;
+//        } else {
+//            velocity.y = 0;
+//        }
+
         Window.tileMap.MoveTile(this);
     }
 
@@ -64,10 +64,46 @@ public class Particle {
     }
 
     public void updatePosition(float x, float y) {
-        Window.tileMap.tiles[(int) this.x][(int) this.y] = null;
+        if (x == this.x && y == this.y)
+            return;
 
+        tickNeighbours();
+
+        Window.tileMap.tiles[(int) this.x][(int) this.y] = null;
         this.x = x;
         this.y = y;
         Window.tileMap.tiles[(int) x][(int) y] = this;
+
+//        tickNeighbours();
+
+        // duped
+        Window.tileMap.AddParticleToTickQueue(this);
+    }
+
+    public void tickNeighbours() {
+        Side.getSides().forEach(side -> {
+            Particle tile = getSide(side);
+            if (tile == null) {
+//                System.out.println("Tile was null ticking neighbours");
+                return;
+            }
+            if (tile == this) {
+//                System.out.println("Tile is itself when ticking neighbours");
+                return;
+            }
+            if (tile.getID() == -1)
+                return;
+
+
+            // aca se genera primero?
+            Window.tileMap.AddParticleToTickQueue(tile);
+//            tile.tick();
+        });
+    }
+
+    public static int idCounter = 0;
+    public int id;
+    public int getID() {
+        return id;
     }
 }

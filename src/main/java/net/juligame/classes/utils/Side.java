@@ -3,6 +3,8 @@ package net.juligame.classes.utils;
 import net.juligame.Window;
 import net.juligame.classes.Particle;
 
+import java.util.ArrayList;
+
 public enum Side {
     TOP,
     BOTTOM,
@@ -22,6 +24,16 @@ public enum Side {
             default:
                 return null;
         }
+    }
+
+    private static ArrayList<Side> sides = new ArrayList<Side>() {{
+        add(TOP);
+        add(BOTTOM);
+        add(LEFT);
+        add(RIGHT);
+    }};
+    public static ArrayList<Side> getSides() {
+        return sides;
     }
 
 }
