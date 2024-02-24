@@ -1,13 +1,15 @@
 package net.juligame.classes;
 
+import net.juligame.Window;
+import net.juligame.classes.utils.ColorUtils;
 import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
 
-import java.awt.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.Random;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -27,6 +29,14 @@ public class TileMap {
         this.height = height;
         alreadyAddedToTickQueue = new boolean[width * height];
         alreadyAddedToAddQueue = new boolean[width * height];
+        colors = new int[width][height];
+
+        // set all the colors to black
+//        for (int x = 0; x < width; x++) {
+//            for (int y = 0; y < height; y++) {
+//                colors[x][y] = 0;
+//            }
+//        }
     }
 
     int tex;
@@ -44,17 +54,10 @@ public class TileMap {
     public void draw() {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                Particle particle = tiles[x][y];
-                if (particle == null) {
-                    b.put((byte) 0);
-                    b.put((byte) 0);
-                    b.put((byte) 0);
-                    continue;
-                }
-
-                byte r = particle.r;
-                byte g = particle.g;
-                byte bl = particle.b;
+                int color = colors[x][y];
+                byte r = (byte) ((color >> 16) & 0xFF);
+                byte g = (byte) ((color >> 8) & 0xFF);
+                byte bl = (byte) (color & 0xFF);
 
                 b.put(r);
                 b.put(g);
@@ -69,8 +72,8 @@ public class TileMap {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, b);
 
         b.clear();
-//        glClear(GL_COLOR_BUFFER_BIT);
-//        glPushMatrix();
+        glClear(GL_COLOR_BUFFER_BIT);
+        glPushMatrix();
 
         glBegin(GL_QUADS);
             glTexCoord2f(0, 0);
@@ -89,6 +92,12 @@ public class TileMap {
     }
 
 
+    boolean ctrlZ = false;
+    public void SendCtrlZ() {
+        ctrlZ = true;
+    }
+
+    public ArrayList<ArrayList<Particle>> history = new ArrayList<>();
     private final Queue<Particle> queuedParticlesToAdd = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private final Queue<Particle> queuedParticlesToTick = new java.util.concurrent.ConcurrentLinkedQueue<>();
     public void Tick() {
@@ -99,15 +108,37 @@ public class TileMap {
             queuedParticlesToAdd.clear();
             queuedParticlesToTick.clear();
             Particle.idCounter = 0;
+            colors = new int[width][height];
+            history.clear();
         }
 
+        if (ctrlZ){
+            ctrlZ = false;
+            System.out.println("Historial size: " + history.size());
+            if (!history.isEmpty()){
+                ArrayList<Particle> h = history.get(history.size() - 1);
+                history.remove(history.size() - 1);
+                System.out.println("Historial size: " + h.size());
+                for (Particle particle : h){
+                    queuedParticlesToAdd.remove(particle);
+                    queuedParticlesToTick.remove(particle);
+                    particles.remove(particle);
+                    tiles[(int) particle.x][(int) particle.y] = null;
+                    ChangeColor((int) particle.x, (int) particle.y, 0);
+                    particle.tickNeighbours();
+                    Particle.idCounter--;
+                }
+            }
+        }
+        
 //        particles.forEach(particle -> particle.tick());
 //        System.out.println("Particles to tick: " + queuedParticlesToTick.size());
+        ArrayList<Particle> historial = new ArrayList<>();
         while (!queuedParticlesToAdd.isEmpty()) {
             Particle particle = queuedParticlesToAdd.poll();
 
             if (tiles[(int) particle.x][(int) particle.y] != null){
-                tiles[(int) particle.x][(int) particle.y].ChangeColor(particle.color);
+                tiles[(int) particle.x][(int) particle.y].SendColorUpdate();
                 continue;
             }
 
@@ -115,24 +146,33 @@ public class TileMap {
 
             particles.add(particle);
             tiles[(int) particle.x][(int) particle.y] = particle;
+            ChangeColor((int) particle.x, (int) particle.y, particle.color.getRGB());
             AddParticleToTickQueue(particle);
+            historial.add(particle);
         }
+        if (!historial.isEmpty())
+            history.add(historial);
 
         alreadyAddedToAddQueue = new boolean[width * height];
 
 
 //        System.out.println("Particles to tick: " + queuedParticlesToTick.size());
-//        Queue<Particle> queuedParticlesToTick = new java.util.LinkedList<>(this.queuedParticlesToTick);
-//        this.queuedParticlesToTick.clear();
-//        alreadyAddedToTickQueue = new boolean[width * height];
-//
-//        while (!queuedParticlesToTick.isEmpty()) {
-//            Particle particle = queuedParticlesToTick.poll();
-//            if (particle == null)
-//                continue;
-//
-//            particle.tick();
-//        }
+        Queue<Particle> queuedParticlesToTick = new java.util.LinkedList<>(this.queuedParticlesToTick);
+        this.queuedParticlesToTick.clear();
+        alreadyAddedToTickQueue = new boolean[width * height];
+
+        while (!queuedParticlesToTick.isEmpty()) {
+            Particle particle = queuedParticlesToTick.poll();
+            if (particle == null)
+                continue;
+
+            particle.tick();
+        }
+    }
+
+    private int[][] colors;
+    public void ChangeColor(int x, int y, int color) {
+        colors[x][y] = color;
     }
 
     private boolean[] alreadyAddedToTickQueue;
@@ -151,6 +191,7 @@ public class TileMap {
             return;
         }
 
+
         queuedParticlesToAdd.add(particle);
         alreadyAddedToAddQueue[(int) (particle.x) + ((int) particle.y * width)] = true;
     }
@@ -158,7 +199,6 @@ public class TileMap {
 
 
     public Particle[][] tiles;
-
     private Particle voidParticle = new Particle();
     public Particle getTile(int x, int y) {
         if (x < 0 || x >= width || y < 0 || y >= height) {
@@ -168,30 +208,63 @@ public class TileMap {
         return tiles[x][y];
     }
 
+    Random random = new Random();
     public void MoveTile(Particle particle) {
-        // trace a line from the current position to the new position
-        // if the line intersects with a tile, stop the movement
-        Vector2 velocity = particle.velocity;
-        if (velocity.x == 0 && velocity.y == 0) {
-            return;
+         Vector2 velocity = particle.velocity.clone();
+
+//        Vector2 velocity =  new Vector2((width / 2) - particle.x, (height / 2) - particle.y).Normalize().Multiply(1);
+
+        int velocityX = (int) velocity.x;
+        float velocityXRemainder = velocity.x - velocityX;
+
+        int velocityY = (int) velocity.y;
+        float velocityYRemainder = velocity.y - velocityY;
+
+        if (Math.random() < Math.abs(velocityXRemainder)) {
+            velocity.x += velocityX > 0 ? 1 : -1;
+        } else {
+            velocity.x = velocityX;
         }
 
+
+        if (Math.random() < Math.abs(velocityYRemainder)) {
+            velocity.y += velocityY > 0 ? 1 : -1;
+        }else {
+            velocity.y = velocityY;
+        }
+
+
+//        System.out.println("Velocity: " + velocity.x + ", " + velocity.y);
 
         float x = particle.x;
         float y = particle.y;
 
-
         int toReachX = (int) (particle.x + velocity.x);
         int toReachY = (int) (particle.y + velocity.y);
 
-//        if (toReachX < 0 || toReachX >= tiles.length || toReachY < 0 || toReachY >= tiles[0].length) {
+        if (toReachX == particle.x && toReachY == particle.y) {
+            if (particle.velocity.x == 0 && particle.velocity.y == 0) {
+//                System.out.println("No velocity");
+                return;
+            }
+
+            AddParticleToTickQueue(particle);
+            return;
+        }
+
+        try {
+//            ChangeColor(toReachX, toReachY, Color.WHITE.getRGB());
 //            return;
-//        }
+        } catch (Exception e) {
 
+        }
 
+//        System.out.println("velocity2 : " + velocity.x + ", " + velocity.y);
         while (true) {
-            int toTestX = (int) (x + Math.signum(velocity.x));
-            int toTestY = (int) (y + Math.signum(velocity.y));
+            Vector2 goTo =  new Vector2(toReachX - x, toReachY - y);
+            int toTestX = (int) (x + (int) Math.signum(goTo.x));
+            int toTestY = (int) (y + (int) Math.signum(goTo.y));
+
 
             Particle pushedTile = getTile(toTestX, toTestY);
             if (pushedTile != null) {
@@ -212,20 +285,27 @@ public class TileMap {
                         second = getTile(toTestX + 1, toTestY);
                     }
 
-
                     if (first == null) {
                         x = random ? toTestX + 1 : toTestX - 1;
                         y = toTestY;
+                        particle.color = random ? ColorUtils.Brighten(particle.color, 1) : ColorUtils.Darken(particle.color, 1);
                     } else if (second == null) {
                         x = random ? toTestX - 1 : toTestX + 1;
                         y = toTestY;
+                        particle.color = random ? ColorUtils.Darken(particle.color, 2) : ColorUtils.Brighten(particle.color, 2);
+
                     } else {
 //                        System.out.println("No space to move");
+                        particle.velocity.x = 0;
+                        particle.velocity.y = 0;
                         break;
                     }
                 }
 
 //                System.out.println("Tile found");
+                particle.velocity.x = 0;
+                particle.velocity.y = 1;
+                Window.tileMap.AddParticleToTickQueue(particle);
                 break;
             }
 
@@ -233,6 +313,8 @@ public class TileMap {
             y = toTestY;
 
             if (x == toReachX && y == toReachY) {
+//                System.out.println("Reached destination");
+//                particle.velocity.y = 1;
                 break;
             }
         }

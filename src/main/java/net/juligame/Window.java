@@ -2,7 +2,9 @@ package net.juligame;
 
 import net.juligame.classes.Particle;
 import net.juligame.classes.TileMap;
-import net.juligame.classes.utils.RandomColor;
+import net.juligame.classes.tools.Explotion;
+import net.juligame.classes.tools.Implotion;
+import net.juligame.classes.utils.ColorUtils;
 import org.lwjgl.opengl.GL;
 
 import javax.imageio.ImageIO;
@@ -46,7 +48,11 @@ public class Window {
         });
 
         glfwSetScrollCallback(window, (window, xoffset, yoffset) -> {
-            brushSize += yoffset;
+            // if presing shift, change the brush size
+            if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+                brushSize += (brushSize * yoffset * .1f) + 1;
+            else
+                brushSize += yoffset;
             if (brushSize < 1) {
                 brushSize = 1;
             }
@@ -108,21 +114,21 @@ public class Window {
     public static int mouseX;
     public static int mouseY;
 
-    public long lastUnixTime = System.currentTimeMillis();
+    public long lastUnixTime = System.nanoTime();
     public int TicksPerSecond = 60;
 
 
-    private float timePerTick = 1000f / TicksPerSecond;
+    private float timePerTick = 1000000000f / TicksPerSecond;
     public void simulation() {
         while (true) {
-            if (System.currentTimeMillis() - lastUnixTime < timePerTick) {
+            if (System.nanoTime() - lastUnixTime < timePerTick)
                 continue;
-            }
+
 
             tileMap.Tick();
-//            System.out.println("The simulation is performing at a ~TPS of " + (1000f / (System.currentTimeMillis() - lastUnixTime)));
-//            System.out.println("Each tick should take: " + timePerTick + " but it took: " + (System.currentTimeMillis() - lastUnixTime));
-            lastUnixTime = System.currentTimeMillis();
+//            System.out.println("The simulation is performing at a ~TPS of " + Math.round(1000000000f / (System.nanoTime() - lastUnixTime)));
+//            System.out.println("Each tick should take: " + timePerTick + " but it took: " + (System.nanoTime() - lastUnixTime));
+            lastUnixTime = System.nanoTime();
         }
     }
 
@@ -157,12 +163,21 @@ public class Window {
             }
 
             boolean isPressed = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-
-            if (isPressed) {
+            if (isPressed)
                 press(mouseX, mouseY);
-            }
 
-            System.out.println("Rendered at a ~FPS of " + (1000f / (System.currentTimeMillis() - lastFrame)));
+            boolean isPressedRight = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+            if (isPressedRight)
+                if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+                    Implotion.Implode(mouseX, mouseY, brushSize);
+                else
+                    Explotion.Explode(mouseX, mouseY, brushSize);
+
+
+            if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS && glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
+                tileMap.SendCtrlZ();
+
+//            System.out.println("Rendered at a ~FPS of " + (1000f / (System.currentTimeMillis() - lastFrame)));
             lastFrame = System.currentTimeMillis();
 
             if (!simThread.isAlive())
@@ -174,7 +189,7 @@ public class Window {
     float brushSize = 1;
 
     void press(int x, int y) {
-        Color color = RandomColor.GetRandomColorPretty();
+        Color color = ColorUtils.GetRandomColorPretty();
         for (int i = (int) -brushSize; i < brushSize; i++) {
             for (int j = (int) -brushSize; j < brushSize; j++) {
                 float distance = (float) Math.sqrt(i * i + j * j);
