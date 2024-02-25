@@ -1,5 +1,6 @@
 package net.juligame;
 
+import imgui.ImGui;
 import net.juligame.classes.Particle;
 import net.juligame.classes.TileMap;
 import net.juligame.classes.tools.Explotion;
@@ -147,31 +148,20 @@ public class Window {
         glEnable(GL_TEXTURE_2D);
     }
 
+    boolean spacePressed = false;
+    int fps = 0;
+    long lastFrameShowFPS = System.currentTimeMillis();
     public void run() {
-        LoadTextures();
-        int fps = 0;
+        if (System.currentTimeMillis() - lastFrameShowFPS > 1000) {
+            Main.debug.FPS = fps;
+            lastFrameShowFPS = System.currentTimeMillis();
+            fps = 0;
+        }
 
-        long lastFrame = System.currentTimeMillis();
-        float frameMS = 1000f / frameRate;
-        tileMap.initTextureAllocations();
+        fps++;
 
-        long lastFrameShowFPS = System.currentTimeMillis();
-        // while (!glfwWindowShouldClose(window)) {
-            if (System.currentTimeMillis() - lastFrame < frameMS )
-                return;
-
-            if (System.currentTimeMillis() - lastFrameShowFPS > 1000) {
-                System.out.println("Rendered at a ~FPS of " + fps);
-                lastFrameShowFPS = System.currentTimeMillis();
-                fps = 0;
-            }
-
-            lastFrame = System.currentTimeMillis();
-            fps++;
-
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear the framebuffer
-
-            tileMap.draw();
+        tileMap.reDrawTexture();
+        tileMap.draw();
 
         if (glfwGetKey(windowID, GLFW_KEY_R) == GLFW_PRESS){
             tileMap.Reset();
@@ -197,9 +187,7 @@ public class Window {
         if (glfwGetKey(windowID, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS && glfwGetKey(windowID, GLFW_KEY_Z) == GLFW_PRESS)
             tileMap.SendCtrlZ();
 
-        lastFrame = System.currentTimeMillis();
-
-        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        if (glfwGetKey(windowID, GLFW_KEY_SPACE) == GLFW_PRESS) {
             if (!spacePressed)
                 tileMap.Pause();
 
