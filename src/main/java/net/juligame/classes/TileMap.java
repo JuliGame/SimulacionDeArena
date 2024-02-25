@@ -6,6 +6,7 @@ import net.juligame.classes.utils.ColorUtils;
 import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
 
+import java.awt.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,19 +41,22 @@ public class TileMap {
 //        }
     }
 
+    boolean paused;
+    public void Pause(){
+//        System.out.println("Paused");
+        paused = !paused;
+    }
     int tex;
     ByteBuffer b;
     public void initTextureAllocations(){
         b = ByteBuffer.allocateDirect(3 * width * height);
         tex = glGenTextures();
-
         glBindTexture(GL_TEXTURE_2D, tex);
-
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, b);
     }
-    public void draw() {
+    public void reDrawTexture() {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 int color = colors[x][y];
@@ -66,32 +70,34 @@ public class TileMap {
             }
         }
         b.flip();
-//        glBindTexture(GL_TEXTURE_2D, tex);
+        glBindTexture(GL_TEXTURE_2D, tex);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, b);
 
         b.clear();
+    }
+
+    public void draw(){
+        glBindTexture(GL_TEXTURE_2D, tex);
         glClear(GL_COLOR_BUFFER_BIT);
         glPushMatrix();
 
         glBegin(GL_QUADS);
-            glTexCoord2f(0, 0);
-            glVertex2f(0, 0);
-            glTexCoord2f(1, 0);
-            glVertex2f(width * Particle.TILE_SIZE, 0);
-            glTexCoord2f(1, 1);
-            glVertex2f(width * Particle.TILE_SIZE, height * Particle.TILE_SIZE);
-            glTexCoord2f(0, 1);
-            glVertex2f(0, height * Particle.TILE_SIZE);
+        glTexCoord2f(0, 0);
+        glVertex2f(0, 0);
+        glTexCoord2f(1, 0);
+        glVertex2f(width * Particle.TILE_SIZE, 0);
+        glTexCoord2f(1, 1);
+        glVertex2f(width * Particle.TILE_SIZE, height * Particle.TILE_SIZE);
+        glTexCoord2f(0, 1);
+        glVertex2f(0, height * Particle.TILE_SIZE);
         glEnd();
 
         glBindTexture(GL_TEXTURE_2D, 0);
 
         glPopMatrix();
-
-
     }
 
 
@@ -114,6 +120,9 @@ public class TileMap {
             colors = new int[width][height];
             history.clear();
         }
+
+        if (paused)
+            return;
 
         if (ctrlZ){
             ctrlZ = false;
@@ -215,25 +224,26 @@ public class TileMap {
     public void MoveTile(Particle particle) {
          Vector2 velocity = particle.velocity.clone();
 
-//        Vector2 velocity =  new Vector2((width / 2) - particle.x, (height / 2) - particle.y).Normalize().Multiply(1);
+//        Vector2 velocity = new Vector2(width / 2 - particle.x, height / 2 - particle.y).Normalize().Multiply(5);
+//        System.out.println(velocity.toString());
 
-        int velocityX = (int) velocity.x;
-        float velocityXRemainder = velocity.x - velocityX;
+        int velocityX = (int) Math.abs(velocity.x);
+        float velocityXRemainder =  Math.abs(velocity.x) - velocityX;
 
-        int velocityY = (int) velocity.y;
-        float velocityYRemainder = velocity.y - velocityY;
+        int velocityY = (int) Math.abs(velocity.y);
+        float velocityYRemainder =  Math.abs(velocity.y) - velocityY;
 
         if (Math.random() < Math.abs(velocityXRemainder)) {
-            velocity.x += velocityX > 0 ? 1 : -1;
+            velocity.x += velocity.x > 0 ? 1 : -1;
         } else {
-            velocity.x = velocityX;
+            velocity.x += velocity.x > 0 ? velocityX : -velocityX;
         }
 
 
         if (Math.random() < Math.abs(velocityYRemainder)) {
-            velocity.y += velocityY > 0 ? 1 : -1;
+            velocity.y += velocity.y > 0 ? 0 : -1;
         }else {
-            velocity.y = velocityY;
+            velocity.y += velocity.y > 0 ? velocityY : -velocityY;
         }
 
 

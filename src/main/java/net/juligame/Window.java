@@ -1,7 +1,6 @@
 package net.juligame;
 
 import imgui.ImGui;
-import imgui.app.Application;
 import net.juligame.classes.Particle;
 import net.juligame.classes.TileMap;
 import net.juligame.classes.tools.Explotion;
@@ -149,8 +148,19 @@ public class Window {
         glEnable(GL_TEXTURE_2D);
     }
 
-    long lastFrame = System.currentTimeMillis();
+    boolean spacePressed = false;
+    int fps = 0;
+    long lastFrameShowFPS = System.currentTimeMillis();
     public void run() {
+        if (System.currentTimeMillis() - lastFrameShowFPS > 1000) {
+            Main.debug.FPS = fps;
+            lastFrameShowFPS = System.currentTimeMillis();
+            fps = 0;
+        }
+
+        fps++;
+
+        tileMap.reDrawTexture();
         tileMap.draw();
 
         if (glfwGetKey(windowID, GLFW_KEY_R) == GLFW_PRESS){
@@ -177,7 +187,15 @@ public class Window {
         if (glfwGetKey(windowID, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS && glfwGetKey(windowID, GLFW_KEY_Z) == GLFW_PRESS)
             tileMap.SendCtrlZ();
 
-        lastFrame = System.currentTimeMillis();
+        if (glfwGetKey(windowID, GLFW_KEY_SPACE) == GLFW_PRESS) {
+            if (!spacePressed)
+                tileMap.Pause();
+
+            spacePressed = true;
+        } else {
+            spacePressed = false;
+        }
+
 
         if (!simThread.isAlive())
             StartSimThread();
