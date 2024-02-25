@@ -133,7 +133,7 @@ public class Window {
     }
 
     public void LoadTextures() {
-        texture = loadTexture("/home/julian/SimulacionDeArena/src/main/resources/wall.jpg");
+//        texture = loadTexture("/home/julian/SimulacionDeArena/src/main/resources/wall.jpg");
         System.out.println("Texture: " + texture);
     }
     public void InitOpenGL(int width, int height) {
