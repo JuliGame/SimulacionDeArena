@@ -10,6 +10,7 @@
 
     <properties>
         <lwjgl.version>3.3.3</lwjgl.version>
+        <imgui.java.version>${version}</imgui.java.version>
     </properties>
 
     <build>
@@ -84,7 +85,20 @@
         </dependencies>
     </dependencyManagement>
 
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
     <dependencies>
+        <dependency>
+            <groupId>com.github.SpaiR.imgui-java</groupId>
+            <artifactId>imgui-java-app</artifactId>
+            <version>v1.86.11</version>
+        </dependency>
+
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl</artifactId>

@@ -1,5 +1,7 @@
 package net.juligame;
 
+import imgui.ImGui;
+import imgui.app.Application;
 import net.juligame.classes.Particle;
 import net.juligame.classes.TileMap;
 import net.juligame.classes.tools.Explotion;
@@ -18,22 +20,25 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Window {
-    private long window;
+    private long windowID;
     public static TileMap tileMap;
     public static int texture;
 
-    public Window(int width, int height, String title) {
+    public Window(Main application) {
         if (!glfwInit()) {
             throw new IllegalStateException("Failed to initialize GLFW");
         }
 
-        window = glfwCreateWindow(width, height, title, NULL, NULL);
-        if (window == 0) {
+        this.windowID = application.getHandle();
+        if (windowID == 0) {
             throw new RuntimeException("Failed to create the GLFW window");
         }
 
-        glfwMakeContextCurrent(window); // Make the OpenGL context current
+        glfwMakeContextCurrent(windowID); // Make the OpenGL context current
         GL.createCapabilities();
+
+        int width = application.WIDTH;
+        int height = application.HEIGHT;
 
         InitOpenGL(width, height);
 //        glLoadIdentity();
@@ -42,21 +47,24 @@ public class Window {
 
         StartSimThread();
 
-        glfwSetCursorPosCallback(window, (window, xpos, ypos) -> {
+        glfwSetCursorPosCallback(windowID, (window, xpos, ypos) -> {
             mouseX = (int) Math.floor(xpos / Particle.TILE_SIZE);
             mouseY = (int) Math.floor((ypos + Particle.TILE_SIZE * 0.5f) / Particle.TILE_SIZE) + 1;
         });
 
-        glfwSetScrollCallback(window, (window, xoffset, yoffset) -> {
+        glfwSetScrollCallback(windowID, (window, xoffset, yoffset) -> {
             // if presing shift, change the brush size
             if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
-                brushSize += (brushSize * yoffset * .1f) + 1;
+                Main.config.brushSize += (float) ((Main.config.brushSize * yoffset * .1f) + 1);
             else
-                brushSize += yoffset;
-            if (brushSize < 1) {
-                brushSize = 1;
+                Main.config.brushSize += (float) yoffset;
+            if (Main.config.brushSize < 1) {
+                Main.config.brushSize = 1;
             }
         });
+
+        LoadTextures();
+        tileMap.initTextureAllocations();
     }
 
     private int loadTexture(String imagePath) {
@@ -116,8 +124,6 @@ public class Window {
 
     public long lastUnixTime = System.nanoTime();
     public int TicksPerSecond = 60;
-
-
     private float timePerTick = 1000000000f / TicksPerSecond;
     public void simulation() {
         while (true) {
@@ -126,8 +132,7 @@ public class Window {
 
 
             tileMap.Tick();
-//            System.out.println("The simulation is performing at a ~TPS of " + Math.round(1000000000f / (System.nanoTime() - lastUnixTime)));
-//            System.out.println("Each tick should take: " + timePerTick + " but it took: " + (System.nanoTime() - lastUnixTime));
+            Main.debug.TPS = Math.round(1000000000f / (System.nanoTime() - lastUnixTime));
             lastUnixTime = System.nanoTime();
         }
     }
@@ -139,64 +144,66 @@ public class Window {
     public void InitOpenGL(int width, int height) {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
+//        glLoadIdentity();
         glOrtho(0, width, height, 0, -1, 1);
         glEnable(GL_TEXTURE_2D);
     }
 
+    long lastFrame = System.currentTimeMillis();
     public void run() {
-        LoadTextures();
-        long lastFrame = System.currentTimeMillis();
-        tileMap.initTextureAllocations();
-        while (!glfwWindowShouldClose(window)) {
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear the framebuffer
+        tileMap.draw();
 
-            tileMap.draw();
-
-            glfwSwapBuffers(window); // Swap the color buffers
-
-            glfwPollEvents(); // Poll for window events
-
-            if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS){
-                tileMap.Reset();
-                System.out.println("Reset");
-            }
-
-            boolean isPressed = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-            if (isPressed)
-                press(mouseX, mouseY);
-
-            boolean isPressedRight = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-            if (isPressedRight)
-                if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
-                    Implotion.Implode(mouseX, mouseY, brushSize);
-                else
-                    Explotion.Explode(mouseX, mouseY, brushSize);
-
-
-            if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS && glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
-                tileMap.SendCtrlZ();
-
-//            System.out.println("Rendered at a ~FPS of " + (1000f / (System.currentTimeMillis() - lastFrame)));
-            lastFrame = System.currentTimeMillis();
-
-            if (!simThread.isAlive())
-                StartSimThread();
+        if (glfwGetKey(windowID, GLFW_KEY_R) == GLFW_PRESS){
+            tileMap.Reset();
+            System.out.println("Reset");
         }
-        simThread.stop();
+
+        //  || ImGui.isItemHovered() ||
+        if (ImGui.isWindowFocused() || ImGui.isWindowHovered())
+            return;
+
+        boolean isPressed = glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+        if (isPressed)
+            press(mouseX, mouseY);
+
+        boolean isPressedRight = glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+        if (isPressedRight)
+            if (glfwGetKey(windowID, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(windowID, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+                Implotion.Implode(mouseX, mouseY, Main.config.brushSize);
+            else
+                Explotion.Explode(mouseX, mouseY, Main.config.brushSize);
+
+
+        if (glfwGetKey(windowID, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS && glfwGetKey(windowID, GLFW_KEY_Z) == GLFW_PRESS)
+            tileMap.SendCtrlZ();
+
+        lastFrame = System.currentTimeMillis();
+
+        if (!simThread.isAlive())
+            StartSimThread();
     }
-
-    float brushSize = 1;
-
     void press(int x, int y) {
-        Color color = ColorUtils.GetRandomColorPretty();
+        Main.config.hue += 0.01f;
+        float hue = Main.config.hue;
+        float brushSize = Main.config.brushSize;
+
+        Color color = ColorUtils.GetRandomColorPretty(hue);
+        Color nextcolor = ColorUtils.GetRandomColorPretty(hue + 0.05f);
+
+//        Color nextcolor = ColorUtils.okLCH(73.15f, 41.09f, hue);
+//        Color color = ColorUtils.okLCH(73.15f, 41.09f, hue + 0.1f);
         for (int i = (int) -brushSize; i < brushSize; i++) {
             for (int j = (int) -brushSize; j < brushSize; j++) {
                 float distance = (float) Math.sqrt(i * i + j * j);
                 float random = (float) Math.random() * brushSize;
 
-                if (random > distance)
-                    new Particle(color, x + i, y + j);
+                if (random > distance) {
+                    if (Math.random() < 0.8f)
+                        new Particle(color, x + i, y + j);
+                    else
+                        new Particle(nextcolor, x + i, y + j);
+
+                }
             }
         }
     }
