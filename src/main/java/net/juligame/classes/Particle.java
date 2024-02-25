@@ -61,12 +61,17 @@ public class Particle {
     }
 
     public Particle getSide(Side side) {
-        return switch (side) {
-            case TOP -> Window.tileMap.getTile((int) x, (int) y - 1);
-            case BOTTOM -> Window.tileMap.getTile((int) x, (int) y + 1);
-            case LEFT -> Window.tileMap.getTile((int) x - 1, (int) y);
-            case RIGHT -> Window.tileMap.getTile((int) x + 1, (int) y);
-        };
+        switch (side) {
+            case TOP:
+                return Window.tileMap.getTile((int) x, (int) y - 1);
+            case BOTTOM:
+                return Window.tileMap.getTile((int) x, (int) y + 1);
+            case LEFT:
+                return Window.tileMap.getTile((int) x - 1, (int) y);
+            case RIGHT:
+                return Window.tileMap.getTile((int) x + 1, (int) y);
+        }
+        return null;
     }
 
     public void updatePosition(float x, float y) {

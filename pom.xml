@@ -9,12 +9,22 @@
     <version>1.0-SNAPSHOT</version>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lwjgl.version>3.3.3</lwjgl.version>
-        <lwjgl.natives>natives-linux</lwjgl.natives>
+        <imgui.java.version>${version}</imgui.java.version>
     </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
     <profiles>
         <profile>
@@ -29,6 +39,25 @@
             <properties>
                 <lwjgl.natives>natives-linux</lwjgl.natives>
             </properties>
+        </profile>
+        <profile>
+            <id>lwjgl-natives-macos-x86_64</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>x86_64</arch>
+                </os>
+            </activation>
+            <properties>
+                <lwjgl.natives>natives-macos</lwjgl.natives>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>org.lwjgl</groupId>
+                    <artifactId>lwjgl-vulkan</artifactId>
+                    <classifier>natives-macos</classifier>
+                </dependency>
+            </dependencies>
         </profile>
         <profile>
             <id>lwjgl-natives-windows-amd64</id>
@@ -56,7 +85,20 @@
         </dependencies>
     </dependencyManagement>
 
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
     <dependencies>
+        <dependency>
+            <groupId>com.github.SpaiR.imgui-java</groupId>
+            <artifactId>imgui-java-app</artifactId>
+            <version>v1.86.11</version>
+        </dependency>
+
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl</artifactId>
@@ -176,10 +218,6 @@
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-opus</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.lwjgl</groupId>
-            <artifactId>lwjgl-ovr</artifactId>
         </dependency>
         <dependency>
             <groupId>org.lwjgl</groupId>
@@ -363,11 +401,6 @@
         </dependency>
         <dependency>
             <groupId>org.lwjgl</groupId>
-            <artifactId>lwjgl-ovr</artifactId>
-            <classifier>${lwjgl.natives}</classifier>
-        </dependency>
-        <dependency>
-            <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-par</artifactId>
             <classifier>${lwjgl.natives}</classifier>
         </dependency>
@@ -437,5 +470,6 @@
             <classifier>${lwjgl.natives}</classifier>
         </dependency>
     </dependencies>
+
 
 </project>
