@@ -7,6 +7,7 @@ import net.juligame.classes.tools.Explotion;
 import net.juligame.classes.tools.Implotion;
 import net.juligame.classes.utils.ColorUtils;
 import net.juligame.classes.utils.Vector2;
+import net.juligame.classes.utils.Vector2Int;
 import org.lwjgl.opengl.GL;
 
 import javax.imageio.ImageIO;
@@ -125,7 +126,7 @@ public class Window {
     public static int mouseY;
 
     public long lastUnixTime = System.nanoTime();
-    public int TicksPerSecond = 60;
+    public static int TicksPerSecond = 60;
     private float timePerTick = 1000000000f / TicksPerSecond;
     public void simulation() {
         while (true) {
@@ -206,22 +207,32 @@ public class Window {
         if (!simThread.isAlive())
             StartSimThread();
     }
-    Vector2 lastMousePos = null;
+    Vector2Int lastMousePos = null;
     void press(int x, int y) {
-        List<Vector2> points = new ArrayList<>();
-        points.add(new Vector2(x, y));
-
+        List<Vector2Int> points = new ArrayList<>();
         if (lastMousePos != null) {
             Vector2 direction = new Vector2(x - lastMousePos.x, y - lastMousePos.y);
-            float distance = (float) Math.sqrt(direction.x * direction.x + direction.y * direction.y);
+            double distance = Math.sqrt(direction.x * direction.x + direction.y * direction.y);
             direction = direction.Normalize();
-            for (int i = 0; i < distance; i++) {
-                points.add(new Vector2((int) (lastMousePos.x + direction.x * i), (int) (lastMousePos.y + direction.y * i)));
+
+            int steps = (int) (Math.floor(distance / Main.config.brushSize) * 4);
+            double lastDistance = 1000000f;
+            for (int i = 0; i < steps; i++) {
+                float x1 = lastMousePos.x + direction.x * i * Main.config.brushSize;
+                float y1 = lastMousePos.y + direction.y * i * Main.config.brushSize;
+                Vector2Int point = new Vector2Int((int) x1, (int) y1);
+                double distanceToMouse = Math.sqrt((x1 - x) * (x1 - x) + (y1 - y) * (y1 - y));
+                if (distanceToMouse > lastDistance)
+                    continue;
+
+                lastDistance = distanceToMouse;
+                points.add(point);
             }
         }
 
-        System.out.println("Points: " + points.size());
-        points.forEach(point -> {
+        points.add(new Vector2Int(x, y));
+
+        for (Vector2Int point : points) {
             Main.config.hue += 0.001f;
             float hue = Main.config.hue;
             float brushSize = Main.config.brushSize;
@@ -233,21 +244,30 @@ public class Window {
 //        Color color = ColorUtils.okLCH(73.15f, 41.09f, hue + 0.1f);
             for (int i = (int) -brushSize; i < brushSize; i++) {
                 for (int j = (int) -brushSize; j < brushSize; j++) {
-                    float distance = (float) Math.sqrt(i * i + j * j);
-                    float random = (float) Math.random() * brushSize;
 
-                    if (random > distance) {
-                        if (Math.random() < 0.8f)
-                            new Particle(color, point.x + i, point.y + j);
+                    int x1 = (int) (point.x + i);
+                    if (x1 < 0 || x1 >= tileMap.tiles.length)
+                        continue;
+
+                    int y1 = (int) (point.y + j);
+                    if (y1 < 0 || y1 >= tileMap.tiles[0].length)
+                        continue;
+
+                    float distance = (float) Math.sqrt(i * i + j * j);
+                    float random = tileMap.randomFloatOfThisTick[Math.abs((int) System.nanoTime()) % tileMap.randomFloatOfThisTick.length];
+
+                    if (random * brushSize > distance) {
+                        if (random < 0.8f)
+                            new Particle(color, (x1), (y1));
                         else
-                            new Particle(nextcolor, point.x + i, point.y + j);
+                            new Particle(nextcolor, (x1), (y1));
 
                     }
                 }
             }
-        });
+        }
 
-        lastMousePos = new Vector2(x, y);
+        lastMousePos = new Vector2Int(x, y);
     }
 
 }

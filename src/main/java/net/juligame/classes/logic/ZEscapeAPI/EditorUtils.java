@@ -9,8 +9,10 @@ import imgui.type.ImString;
 import net.juligame.Main;
 import net.juligame.classes.logic.CreatingMenu;
 import net.juligame.classes.logic.annotations.ShowVar;
+import net.juligame.classes.utils.Vector2;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -18,9 +20,9 @@ public class EditorUtils {
     public void Draw(CreatingMenu itemEditorMain) throws Exception {
         Object _item = itemEditorMain.edited;
         ImGui.setCursorPosX(ImGui.getCursorPosX() + 600);
-        if (ImGui.button("X", 20, 20)) {
-            Main.instance.menus.remove(itemEditorMain);
-        }
+//        if (ImGui.button("X", 20, 20)) {
+//            Main.instance.menus.remove(itemEditorMain);
+//        }
         ImGui.sameLine();
         ImGui.setCursorPosX(10);
 
@@ -34,6 +36,7 @@ public class EditorUtils {
                 for (Field fieldInfo : Value) {
                     fieldInfo.setAccessible(true);
 
+                    Method callback = null;
                     if (fieldInfo.isAnnotationPresent(ShowVar.class)) {
                         ShowVar showVar = fieldInfo.getAnnotation(ShowVar.class);
                         if (!showVar.editable()) {
@@ -44,6 +47,10 @@ public class EditorUtils {
 //                            ClipboardHelper.HandleRightClick(fieldInfo, _item);
                             }
                             continue;
+                        } else {
+                            if (!showVar.callback().isEmpty()) {
+                                callback = _item.getClass().getMethod(showVar.callback());
+                            }
                         }
                     } else {
                         continue;
@@ -101,6 +108,29 @@ public class EditorUtils {
                         ImInt imInt = new ImInt(value);
 //                        ImGui.combo(fieldInfo.getName(), imInt, Enum.GetNames(fieldInfo.getType()), Enum.GetNames(fieldInfo.getType()).length);
                         fieldInfo.set(_item, imInt.get());
+
+                        if (ImGui.isItemClicked(ImGuiMouseButton.Right)) {
+//                            ClipboardHelper.HandleRightClick(fieldInfo, _item);
+                        }
+                    }
+
+                    if (fieldInfo.getType() == Vector2.class) {
+                        Vector2 value = (Vector2) fieldInfo.get(_item);
+                        ImFloat ImIntX = new ImFloat(value.x);
+                        ImFloat ImIntY = new ImFloat(value.y);
+                        ImGui.inputFloat("X #" + value.hashCode(), ImIntX);
+                        ImGui.sameLine();
+                        ImGui.inputFloat("Y #" + value.hashCode(), ImIntY);
+
+                        if (value.x != ImIntX.get() || value.y != ImIntY.get()) {
+                            value.x = ImIntX.get();
+                            value.y = ImIntY.get();
+                            fieldInfo.set(_item, value);
+
+                            if (callback != null)
+                                callback.invoke(_item);
+                        }
+
 
                         if (ImGui.isItemClicked(ImGuiMouseButton.Right)) {
 //                            ClipboardHelper.HandleRightClick(fieldInfo, _item);
