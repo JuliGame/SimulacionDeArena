@@ -8,4 +8,6 @@ public class Debug {
     public int TPS = 1;
     @ShowVar(editable = false)
     public int FPS;
+    @ShowVar(editable = false)
+    public int TickingParticles;
 }

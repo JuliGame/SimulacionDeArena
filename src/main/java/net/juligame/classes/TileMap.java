@@ -1,6 +1,7 @@
 package net.juligame.classes;
 
 import imgui.ImGui;
+import net.juligame.Main;
 import net.juligame.Window;
 import net.juligame.classes.utils.ColorUtils;
 import net.juligame.classes.utils.Side;
@@ -121,9 +122,6 @@ public class TileMap {
             history.clear();
         }
 
-        if (paused)
-            return;
-
         if (ctrlZ){
             ctrlZ = false;
             System.out.println("Historial size: " + history.size());
@@ -167,8 +165,13 @@ public class TileMap {
 
         alreadyAddedToAddQueue = new boolean[width * height];
 
+        Main.debug.TickingParticles = queuedParticlesToTick.size();
+
+        if (paused)
+            return;
 
 //        System.out.println("Particles to tick: " + queuedParticlesToTick.size());
+
         Queue<Particle> queuedParticlesToTick = new java.util.LinkedList<>(this.queuedParticlesToTick);
         this.queuedParticlesToTick.clear();
         alreadyAddedToTickQueue = new boolean[width * height];
@@ -227,7 +230,7 @@ public class TileMap {
 //        Vector2 velocity = new Vector2(width / 2 - particle.x, height / 2 - particle.y).Normalize().Multiply(5);
 //        System.out.println(velocity.toString());
 
-        int velocityX = (int) Math.abs(velocity.x);
+        int velocityX = (int) Math.floor(Math.abs(velocity.x));
         float velocityXRemainder =  Math.abs(velocity.x) - velocityX;
 
         int velocityY = (int) Math.abs(velocity.y);
@@ -236,18 +239,15 @@ public class TileMap {
         if (Math.random() < Math.abs(velocityXRemainder)) {
             velocity.x += velocity.x > 0 ? 1 : -1;
         } else {
-            velocity.x += velocity.x > 0 ? velocityX : -velocityX;
+            velocity.x = velocity.x > 0 ? velocityX : -velocityX;
         }
-
 
         if (Math.random() < Math.abs(velocityYRemainder)) {
-            velocity.y += velocity.y > 0 ? 0 : -1;
+            velocity.y += velocity.y > 0 ? 1 : -1;
         }else {
-            velocity.y += velocity.y > 0 ? velocityY : -velocityY;
+            velocity.y = velocity.y > 0 ? velocityY : -velocityY;
         }
 
-
-//        System.out.println("Velocity: " + velocity.x + ", " + velocity.y);
 
         float x = particle.x;
         float y = particle.y;
@@ -284,7 +284,7 @@ public class TileMap {
 //                System.out.println("Tile found");
                 Side moveSide = velocity.x > 0 ? Side.LEFT : velocity.x < 0 ? Side.RIGHT : velocity.y > 0 ? Side.TOP : Side.BOTTOM;
 
-                if (moveSide == Side.TOP || moveSide == Side.BOTTOM) {
+//                if (moveSide == Side.TOP || moveSide == Side.BOTTOM) {
 //                    System.out.println("Bottom");
                     boolean random = Math.random() > 0.5;
                     Particle first;
@@ -308,17 +308,10 @@ public class TileMap {
                         particle.color = random ? ColorUtils.Darken(particle.color, 2) : ColorUtils.Brighten(particle.color, 2);
 
                     } else {
-//                        System.out.println("No space to move");
-                        particle.velocity.x = 0;
-                        particle.velocity.y = 0;
                         break;
                     }
-                }
+//                }
 
-//                System.out.println("Tile found");
-                particle.velocity.x = 0;
-                particle.velocity.y = 1;
-                Window.tileMap.AddParticleToTickQueue(particle);
                 break;
             }
 

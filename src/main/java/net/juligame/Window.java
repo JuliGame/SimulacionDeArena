@@ -6,6 +6,7 @@ import net.juligame.classes.TileMap;
 import net.juligame.classes.tools.Explotion;
 import net.juligame.classes.tools.Implotion;
 import net.juligame.classes.utils.ColorUtils;
+import net.juligame.classes.utils.Vector2;
 import org.lwjgl.opengl.GL;
 
 import javax.imageio.ImageIO;
@@ -13,6 +14,8 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -48,7 +51,7 @@ public class Window {
 
         glfwSetCursorPosCallback(windowID, (window, xpos, ypos) -> {
             mouseX = (int) Math.floor(xpos / Particle.TILE_SIZE);
-            mouseY = (int) Math.floor((ypos + Particle.TILE_SIZE * 0.5f) / Particle.TILE_SIZE) + 1;
+            mouseY = (int) Math.ceil(ypos / Particle.TILE_SIZE);
         });
 
         glfwSetScrollCallback(windowID, (window, xoffset, yoffset) -> {
@@ -175,6 +178,9 @@ public class Window {
         boolean isPressed = glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
         if (isPressed)
             press(mouseX, mouseY);
+        else
+            lastMousePos = null;
+
 
         boolean isPressedRight = glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
         if (isPressedRight)
@@ -200,30 +206,48 @@ public class Window {
         if (!simThread.isAlive())
             StartSimThread();
     }
+    Vector2 lastMousePos = null;
     void press(int x, int y) {
-        Main.config.hue += 0.01f;
-        float hue = Main.config.hue;
-        float brushSize = Main.config.brushSize;
+        List<Vector2> points = new ArrayList<>();
+        points.add(new Vector2(x, y));
 
-        Color color = ColorUtils.GetRandomColorPretty(hue);
-        Color nextcolor = ColorUtils.GetRandomColorPretty(hue + 0.05f);
+        if (lastMousePos != null) {
+            Vector2 direction = new Vector2(x - lastMousePos.x, y - lastMousePos.y);
+            float distance = (float) Math.sqrt(direction.x * direction.x + direction.y * direction.y);
+            direction = direction.Normalize();
+            for (int i = 0; i < distance; i++) {
+                points.add(new Vector2((int) (lastMousePos.x + direction.x * i), (int) (lastMousePos.y + direction.y * i)));
+            }
+        }
+
+        System.out.println("Points: " + points.size());
+        points.forEach(point -> {
+            Main.config.hue += 0.001f;
+            float hue = Main.config.hue;
+            float brushSize = Main.config.brushSize;
+
+            Color color = ColorUtils.GetRandomColorPretty(hue);
+            Color nextcolor = ColorUtils.GetRandomColorPretty(hue + 0.005f);
 
 //        Color nextcolor = ColorUtils.okLCH(73.15f, 41.09f, hue);
 //        Color color = ColorUtils.okLCH(73.15f, 41.09f, hue + 0.1f);
-        for (int i = (int) -brushSize; i < brushSize; i++) {
-            for (int j = (int) -brushSize; j < brushSize; j++) {
-                float distance = (float) Math.sqrt(i * i + j * j);
-                float random = (float) Math.random() * brushSize;
+            for (int i = (int) -brushSize; i < brushSize; i++) {
+                for (int j = (int) -brushSize; j < brushSize; j++) {
+                    float distance = (float) Math.sqrt(i * i + j * j);
+                    float random = (float) Math.random() * brushSize;
 
-                if (random > distance) {
-                    if (Math.random() < 0.8f)
-                        new Particle(color, x + i, y + j);
-                    else
-                        new Particle(nextcolor, x + i, y + j);
+                    if (random > distance) {
+                        if (Math.random() < 0.8f)
+                            new Particle(color, point.x + i, point.y + j);
+                        else
+                            new Particle(nextcolor, point.x + i, point.y + j);
 
+                    }
                 }
             }
-        }
+        });
+
+        lastMousePos = new Vector2(x, y);
     }
 
 }

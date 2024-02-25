@@ -22,7 +22,7 @@ public class Explotion {
         }
     }
     public static void Explode(int x, int y, float size) {
-        size = size * 4;
+        size = size * 1.3f;
         List<Info> particles = new ArrayList<>();
         for (int i = (int) -size; i < size; i++) {
             for (int j = (int) -size; j < size; j++) {
@@ -48,7 +48,7 @@ public class Explotion {
             float force = finalSize * 5 / Math.max(info.distance, 1);
 
             Particle particle = info.particle;
-            particle.velocity = info.direction.Multiply(force);
+            particle.SetVelocityWithTimeBurn(info.direction.Multiply(force), .3f);
             Window.tileMap.AddParticleToTickQueue(particle);
         });
     }

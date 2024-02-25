@@ -43,7 +43,8 @@ public class Implotion {
 
         float finalSize = size;
         particles.forEach(info -> {
-            float force = finalSize * 1 / Math.max(info.distance, 1);
+            float force = finalSize / Math.max(info.distance, 1);
+//            force = Math.max(force, 1f);
 
             Particle particle = info.particle;
             particle.velocity = info.direction.Multiply(force);
