@@ -115,7 +115,7 @@ public class Window {
     public static int mouseY;
 
     public long lastUnixTime = System.nanoTime();
-    public int TicksPerSecond = 60;
+    public int TicksPerSecond = 20;
 
 
     private float timePerTick = 1000000000f / TicksPerSecond;
@@ -133,9 +133,10 @@ public class Window {
     }
 
     public void LoadTextures() {
-        texture = loadTexture("/home/julian/SimulacionDeArena/src/main/resources/wall.jpg");
-        System.out.println("Texture: " + texture);
+//        texture = loadTexture("/home/julian/SimulacionDeArena/src/main/resources/wall.jpg");
+//        System.out.println("Texture: " + texture);
     }
+
     public void InitOpenGL(int width, int height) {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glMatrixMode(GL_PROJECTION);
@@ -144,11 +145,30 @@ public class Window {
         glEnable(GL_TEXTURE_2D);
     }
 
+    int frameRate = 60;
+    boolean spacePressed = false;
     public void run() {
         LoadTextures();
+        int fps = 0;
+
         long lastFrame = System.currentTimeMillis();
+        float frameMS = 1000f / frameRate;
         tileMap.initTextureAllocations();
+
+        long lastFrameShowFPS = System.currentTimeMillis();
         while (!glfwWindowShouldClose(window)) {
+            if (System.currentTimeMillis() - lastFrame < frameMS )
+                continue;
+
+            if (System.currentTimeMillis() - lastFrameShowFPS > 1000) {
+                System.out.println("Rendered at a ~FPS of " + fps);
+                lastFrameShowFPS = System.currentTimeMillis();
+                fps = 0;
+            }
+
+            lastFrame = System.currentTimeMillis();
+            fps++;
+
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear the framebuffer
 
             tileMap.draw();
@@ -177,8 +197,15 @@ public class Window {
             if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS && glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
                 tileMap.SendCtrlZ();
 
-//            System.out.println("Rendered at a ~FPS of " + (1000f / (System.currentTimeMillis() - lastFrame)));
-            lastFrame = System.currentTimeMillis();
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+                if (!spacePressed)
+                    tileMap.Pause();
+
+                spacePressed = true;
+            } else {
+                spacePressed = false;
+            }
+
 
             if (!simThread.isAlive())
                 StartSimThread();

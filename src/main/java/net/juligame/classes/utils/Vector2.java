@@ -35,4 +35,8 @@ public class Vector2 {
         return new Vector2(x, y);
     }
 
+    @Override
+    public String toString() {
+        return "X: " + x + "   Y:" + y;
+    }
 }

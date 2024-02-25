@@ -5,6 +5,7 @@ import net.juligame.classes.utils.ColorUtils;
 import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
 
+import java.awt.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,6 +40,11 @@ public class TileMap {
 //        }
     }
 
+    boolean paused;
+    public void Pause(){
+//        System.out.println("Paused");
+        paused = !paused;
+    }
     int tex;
     ByteBuffer b;
     public void initTextureAllocations(){
@@ -111,6 +117,9 @@ public class TileMap {
             colors = new int[width][height];
             history.clear();
         }
+
+        if (paused)
+            return;
 
         if (ctrlZ){
             ctrlZ = false;
@@ -212,25 +221,26 @@ public class TileMap {
     public void MoveTile(Particle particle) {
          Vector2 velocity = particle.velocity.clone();
 
-//        Vector2 velocity =  new Vector2((width / 2) - particle.x, (height / 2) - particle.y).Normalize().Multiply(1);
+//        Vector2 velocity = new Vector2(width / 2 - particle.x, height / 2 - particle.y).Normalize().Multiply(5);
+//        System.out.println(velocity.toString());
 
-        int velocityX = (int) velocity.x;
-        float velocityXRemainder = velocity.x - velocityX;
+        int velocityX = (int) Math.abs(velocity.x);
+        float velocityXRemainder =  Math.abs(velocity.x) - velocityX;
 
-        int velocityY = (int) velocity.y;
-        float velocityYRemainder = velocity.y - velocityY;
+        int velocityY = (int) Math.abs(velocity.y);
+        float velocityYRemainder =  Math.abs(velocity.y) - velocityY;
 
         if (Math.random() < Math.abs(velocityXRemainder)) {
-            velocity.x += velocityX > 0 ? 1 : -1;
+            velocity.x += velocity.x > 0 ? 1 : -1;
         } else {
-            velocity.x = velocityX;
+            velocity.x += velocity.x > 0 ? velocityX : -velocityX;
         }
 
 
         if (Math.random() < Math.abs(velocityYRemainder)) {
-            velocity.y += velocityY > 0 ? 1 : -1;
+            velocity.y += velocity.y > 0 ? 0 : -1;
         }else {
-            velocity.y = velocityY;
+            velocity.y += velocity.y > 0 ? velocityY : -velocityY;
         }
 
 
