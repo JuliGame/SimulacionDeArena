@@ -3,6 +3,7 @@ package net.juligame;
 import imgui.ImGui;
 import net.juligame.classes.Particle;
 import net.juligame.classes.TileMap;
+import net.juligame.classes.threading.TileMapChanges;
 import net.juligame.classes.tools.Explotion;
 import net.juligame.classes.tools.Implotion;
 import net.juligame.classes.utils.ColorUtils;
@@ -177,8 +178,13 @@ public class Window {
             return;
 
         boolean isPressed = glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-        if (isPressed)
-            press(mouseX, mouseY);
+        if (isPressed) {
+            // detect alt key
+            if (glfwGetKey(windowID, GLFW_KEY_LEFT_ALT) == GLFW_PRESS || glfwGetKey(windowID, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS)
+                TileMapChanges.findFreSpot(new Vector2Int(mouseX, mouseY), true);
+            else
+                press(mouseX, mouseY);
+        }
         else
             lastMousePos = null;
 
@@ -245,12 +251,12 @@ public class Window {
             for (int i = (int) -brushSize; i < brushSize; i++) {
                 for (int j = (int) -brushSize; j < brushSize; j++) {
 
-                    int x1 = (int) (point.x + i);
-                    if (x1 < 0 || x1 >= tileMap.tiles.length)
+                    int x1 = (point.x + i);
+                    if (x1 < 0 || x1 >= tileMap.width)
                         continue;
 
-                    int y1 = (int) (point.y + j);
-                    if (y1 < 0 || y1 >= tileMap.tiles[0].length)
+                    int y1 = (point.y + j);
+                    if (y1 < 0 || y1 >= tileMap.height)
                         continue;
 
                     float distance = (float) Math.sqrt(i * i + j * j);

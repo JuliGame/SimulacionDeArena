@@ -10,4 +10,8 @@ public class Debug {
     public int FPS;
     @ShowVar(editable = false)
     public int TickingParticles;
+    @ShowVar(editable = false)
+    public int Particles;
+    @ShowVar(editable = false)
+    public boolean isPaused;
 }

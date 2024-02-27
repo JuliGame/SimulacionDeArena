@@ -1,8 +1,7 @@
 package net.juligame.classes;
 
 import net.juligame.Main;
-import net.juligame.classes.threading.QueueUtils;
-import net.juligame.classes.threading.WorkerThread;
+import net.juligame.classes.threading.TileMapChanges;
 import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
 import net.juligame.classes.utils.Vector2Int;
@@ -12,8 +11,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -24,18 +21,19 @@ public class TileMap {
     public void Reset() {
         queueReset = true;
     }
-    int width, height;
+    public int width, height;
     public TileMap(int width, int height) {
-        tiles = new Particle[width][height];
+        tiles = new Particle[width * height];
         this.width = width;
         this.height = height;
         alreadyAddedToTickQueue = new boolean[width * height];
-        alreadyAddedToAddQueue = new boolean[width * height];
         colors = new int[width][height];
         for (int i = 0; i < randomFloatOfThisTick.length; i++) {
             randomFloatOfThisTick[i] = randomClass.nextFloat();
         }
         Side.preComputeRandomSidesArray();
+        queuedParticlesToTick = new ArrayList<>(width * height);
+        TileMapChanges.setTilemap(tiles, width, height);
     }
     // region Render
     int tex;
@@ -105,13 +103,19 @@ public class TileMap {
     }
     public ArrayList<ArrayList<Particle>> history = new ArrayList<>();
     private final Queue<Particle> queuedParticlesToAdd = new java.util.concurrent.ConcurrentLinkedQueue<>();
-    private Queue<Particle> queuedParticlesToTick = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private List<Particle> queuedParticlesToTick;
     public float[] randomFloatOfThisTick = new float[100];
+
+    int threads = 20;
+    //creating a pool of 5 threads
+    boolean[] alreadyAddedToTickQueue2;
     public void Tick() {
+        Main.debug.isPaused = paused;
+
         if (queueReset) {
             queueReset = false;
             particles.clear();
-            tiles = new Particle[width][height];
+            tiles = new Particle[width * height];
             queuedParticlesToAdd.clear();
             queuedParticlesToTick.clear();
             Particle.idCounter = 0;
@@ -122,6 +126,8 @@ public class TileMap {
             for (int i = 0; i < randomFloatOfThisTick.length; i++) {
                 randomFloatOfThisTick[i] = randomClass.nextFloat();
             }
+
+            TileMapChanges.setTilemap(tiles, width, height);
         }
 
         if (ctrlZ){
@@ -133,8 +139,7 @@ public class TileMap {
                     queuedParticlesToAdd.remove(particle);
                     queuedParticlesToTick.remove(particle);
                     particles.remove(particle);
-                    tiles[(int) particle.x][(int) particle.y] = null;
-                    ChangeColor((int) particle.x, (int) particle.y, 0);
+                    removeParticle(particle.x, particle.y);
                     particle.tickNeighbours();
                     Particle.idCounter--;
                 }
@@ -142,59 +147,52 @@ public class TileMap {
         }
 
         ArrayList<Particle> historial = new ArrayList<>();
+
+        if (!paused)
+            alreadyAddedToTickQueue2 = new boolean[width * height];
+
         while (!queuedParticlesToAdd.isEmpty()) {
             Particle particle = queuedParticlesToAdd.poll();
 
-            if (tiles[(int) particle.x][(int) particle.y] != null){
-                tiles[(int) particle.x][(int) particle.y].SendColorUpdate();
+            if (getTile(particle.x, particle.y) != null)
                 continue;
-            }
+
+            if (alreadyAddedToTickQueue2[particle.x + particle.y * width])
+                continue;
+
+            alreadyAddedToTickQueue2[particle.x + particle.y * width] = true;
 
             particle.id = Particle.idCounter++;
-
             particles.add(particle);
-            tiles[(int) particle.x][(int) particle.y] = particle;
-            ChangeColor((int) particle.x, (int) particle.y, particle.color.getRGB());
+            addParticle(particle);
             AddParticleToTickQueue(particle);
             historial.add(particle);
+            particle.SendColorUpdate();
         }
+
+
         if (!historial.isEmpty())
             history.add(historial);
 
-        alreadyAddedToAddQueue = new boolean[width * height];
 
         Main.debug.TickingParticles = queuedParticlesToTick.size();
+        Main.debug.Particles = particles.size();
 
         if (paused)
             return;
 
         tick++;
         CalculateWindForce();
-        Queue<Particle> queuedParticlesToTick = new java.util.LinkedList<>(this.queuedParticlesToTick);
-        this.queuedParticlesToTick = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        List<Particle> queuedParticlesToTick = new java.util.LinkedList<>(this.queuedParticlesToTick);
+        this.queuedParticlesToTick = new ArrayList<>(width * height);
+
         alreadyAddedToTickQueue = new boolean[width * height];
 
-        int threads = 20;
-        Queue<Particle>[] queuedParticlesList = QueueUtils.splitQueue(queuedParticlesToTick, threads * 5);
-        ExecutorService executor = Executors.newFixedThreadPool(threads);//creating a pool of 5 threads
-        for (int i = 0; i < threads * 5; i++) {
-            Runnable worker = new WorkerThread(queuedParticlesList[i]);
-            executor.execute(worker);//calling execute method of ExecutorService
+        for (Particle particle : queuedParticlesToTick) {
+            particle.tick();
         }
-        executor.shutdown();
-        while (!executor.isTerminated()) {   }
 
-        System.out.println("Finished all threads");
-
-
-
-//        while (!queuedParticlesToTick.isEmpty()) {
-//            Particle particle = queuedParticlesToTick.poll();
-//            if (particle == null)
-//                continue;
-//
-//            particle.tick();
-//        }
+        tiles = TileMapChanges.Resove();
     }
 
     private int[][] colors;
@@ -212,27 +210,29 @@ public class TileMap {
         alreadyAddedToTickQueue[particle.getID()] = true;
     }
 
-    private boolean[] alreadyAddedToAddQueue;
     public void AddParticleToAddQueue(Particle particle) {
-        if (alreadyAddedToAddQueue[(particle.x) + (particle.y * width)]) {
-            return;
-        }
-
-
         queuedParticlesToAdd.add(particle);
-        alreadyAddedToAddQueue[(int) (particle.x) + ((int) particle.y * width)] = true;
     }
     // endregion
 
 
-    public Particle[][] tiles;
+    public Particle[] tiles;
     private final Particle voidParticle = new Particle();
     public Particle getTile(int x, int y) {
         if (x < 0 || x >= width || y < 0 || y >= height) {
             return voidParticle;
         }
 
-        return tiles[x][y];
+        return tiles[x + y * width];
+    }
+    public void addParticle(Particle particle) {
+        TileMapChanges.addParticle(particle);
+    }
+    public void removeParticle(int x, int y) {
+        TileMapChanges.removeParticle(new Vector2Int(x, y));
+    }
+    public void changeParticle(Particle particle, Vector2Int to) {
+        TileMapChanges.changeParticle(new TileMapChanges.TileMapChange(particle, to));
     }
 
     // region physics
@@ -325,7 +325,12 @@ public class TileMap {
                 break;
             }
         }
+        // if particle didn't move return
+        if (x == particle.x && y == particle.y) {
+            return;
+        }
 
+        AddParticleToTickQueue(particle);
         particle.updatePosition(x, y);
     }
 

@@ -1,5 +1,6 @@
 package net.juligame;
 
+import net.juligame.classes.Particle;
 import net.juligame.classes.logic.annotations.ShowVar;
 import net.juligame.classes.utils.Vector2;
 
@@ -11,7 +12,12 @@ public class Config {
     @ShowVar(editable = true, callback = "onGravityChanged")
     public Vector2 gravity = new Vector2(0, 0.14f);
     public void onGravityChanged() {
-        Window.tileMap.particles.forEach(p -> Window.tileMap.AddParticleToTickQueue(p));
+        Window.tileMap.particles.forEach(p -> {
+            p.velocity.y = 0;
+            p.velocity.x = 0;
+            Window.tileMap.AddParticleToTickQueue(p);
+        });
+        Particle.Gravity = gravity;
     }
 
     @ShowVar(editable = true, callback = "onWindForceChanged")

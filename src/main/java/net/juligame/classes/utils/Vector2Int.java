@@ -39,4 +39,18 @@ public class Vector2Int {
     public String toString() {
         return "X: " + x + "   Y:" + y;
     }
+
+    public Vector2Int add(Vector2Int dir) {
+        x += dir.x;
+        y += dir.y;
+        return this;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Vector2Int that = (Vector2Int) o;
+        return x == that.x && y == that.y;
+    }
 }

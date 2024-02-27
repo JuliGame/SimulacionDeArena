@@ -5,16 +5,18 @@ import net.juligame.Window;
 import net.juligame.classes.utils.ColorUtils;
 import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
+import net.juligame.classes.utils.Vector2Int;
 
 import java.awt.*;
 
 public class Particle {
-    public static int TILE_SIZE = 1;
-//    public static int TILE_SIZE = 4;
+//    public static int TILE_SIZE = 1;
+    public static int TILE_SIZE = 8;
     public Color color;
     public Color colorOverlay = Color.BLACK;
     public Vector2 velocity = new Vector2(0, 0);
-    public int x, y;
+    public int x;
+    public int y;
 
 
     public Particle(){
@@ -26,7 +28,7 @@ public class Particle {
         this.x = x;
         this.y = y;
 
-        if (x < 0 || x >= Window.tileMap.tiles.length || y < 0 || y >= Window.tileMap.tiles[0].length) {
+        if (x < 0 || x >= Window.tileMap.width || y < 0 || y >= Window.tileMap.height) {
             return;
         }
 
@@ -34,7 +36,7 @@ public class Particle {
     }
 
     public void SendColorUpdate() {
-        Window.tileMap.ChangeColor((int) x, (int) y, ColorUtils.addColors(color, colorOverlay).getRGB());
+        Window.tileMap.ChangeColor(x, y, ColorUtils.addColors(color, colorOverlay).getRGB());
     }
 
     private long burnAtUnix = 0;
@@ -47,10 +49,8 @@ public class Particle {
     }
 
     public static Vector2 WindForce = new Vector2(0, 0);
+    public static Vector2 Gravity = Main.config.gravity;
     public void tick() {
-        if (!ShouldTick())
-            return;
-
         if (System.currentTimeMillis() - burnAtUnix < 0) {
             float burn = (float) (burnAtUnix - System.currentTimeMillis()) / burnTime;
             burnVelocity.Multiply(burn);
@@ -58,8 +58,8 @@ public class Particle {
             burnVelocity = new Vector2(0, 0);
         }
 
-        velocity.y += Main.config.gravity.y;
-        velocity.x += Main.config.gravity.x;
+        velocity.y += Gravity.y;
+        velocity.x += Gravity.x;
 
         velocity.x += WindForce.x;
         velocity.y += WindForce.y;
@@ -68,25 +68,6 @@ public class Particle {
 
         Window.tileMap.MoveTile(this);
 
-    }
-
-    public boolean ShouldTick() {
-        if (System.currentTimeMillis() - burnAtUnix < 0)
-            return true;
-
-        Particle down = getSide(Side.BOTTOM);
-        if (down == null)
-            return true;
-
-        Particle left = getSide(Side.LEFT);
-        if (left == null)
-            return true;
-
-        Particle right = getSide(Side.RIGHT);
-        if (right == null)
-            return true;
-
-        return false;
     }
 
     public Particle getSide(Side side) {
@@ -109,16 +90,9 @@ public class Particle {
 
         tickAllNeighbours();
 
-        Window.tileMap.tiles[this.x][this.y] = null;
-        Window.tileMap.ChangeColor(this.x, this.y, 0);
-        this.x = x;
-        this.y = y;
-        Window.tileMap.tiles[x][y] = this;
+        Window.tileMap.changeParticle(this, new Vector2Int(x, y));
 
 //        tickAllNeighbours();
-
-        SendColorUpdate();
-        Window.tileMap.AddParticleToTickQueue(this);
     }
 
     public void tickNeighbours() {
