@@ -1,7 +1,9 @@
 package net.juligame.classes;
 
 import net.juligame.Main;
+import net.juligame.classes.threading.QueueUtils;
 import net.juligame.classes.threading.TileMapChanges;
+import net.juligame.classes.threading.WorkerThread;
 import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
 import net.juligame.classes.utils.Vector2Int;
@@ -11,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -188,9 +193,51 @@ public class TileMap {
 
         alreadyAddedToTickQueue = new boolean[width * height];
 
-        for (Particle particle : queuedParticlesToTick) {
-            particle.tick();
+//        for (Particle particle : queuedParticlesToTick) {
+//            particle.tick();
+//        }
+
+        List<Particle>[] queuedParticlesList = QueueUtils.splitQueue(queuedParticlesToTick, threads * 5);
+        ExecutorService executor = Executors.newFixedThreadPool(threads);//creating a pool of 5 threads
+
+        List<Future<List<TileMapChanges.TileMapChange>>> list = new ArrayList<>();
+        for (int i = 0; i < threads * 5; i++) {
+            int finalI = i;
+            Future<List<TileMapChanges.TileMapChange>> future = executor.submit(() -> {
+                List<TileMapChanges.TileMapChange> changes = new ArrayList<>();
+                if (queuedParticlesList[finalI] == null)
+                    return changes;
+
+                for (Particle particle : queuedParticlesList[finalI]) {
+                    changes.add(particle.tick());
+                }
+                return changes;
+            });
+            list.add(future);
         }
+        executor.shutdown();
+
+
+
+        while (!executor.isTerminated()) {
+            for (Future<List<TileMapChanges.TileMapChange>> future : list) {
+                if (!future.isDone())
+                    continue;
+
+                try {
+                    List<TileMapChanges.TileMapChange> changes = future.get();
+
+                    for (TileMapChanges.TileMapChange change : changes)
+                        TileMapChanges.changeParticle(change);
+
+                    System.out.println("Finished one thread!");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+
 
         tiles = TileMapChanges.Resove();
     }
@@ -237,7 +284,9 @@ public class TileMap {
 
     // region physics
     Random randomClass = new Random();
-    public void MoveTile(Particle particle) {
+    public TileMapChanges.TileMapChange MoveTile(Particle particle) {
+         TileMapChanges.TileMapChange change = new TileMapChanges.TileMapChange(particle, new Vector2Int(particle.x, particle.y));
+
          Vector2 velocity = particle.velocity.clone();
 
          velocity.y += particle.burnVelocity.y;
@@ -274,11 +323,11 @@ public class TileMap {
         if (toReachX == particle.x && toReachY == particle.y) {
             if (particle.velocity.x == 0 && particle.velocity.y == 0) {
 //                System.out.println("No velocity");
-                return;
+                return change;
             }
 
             AddParticleToTickQueue(particle);
-            return;
+            return change;
         }
 
         try {
@@ -327,11 +376,14 @@ public class TileMap {
         }
         // if particle didn't move return
         if (x == particle.x && y == particle.y) {
-            return;
+            return change;
         }
 
         AddParticleToTickQueue(particle);
-        particle.updatePosition(x, y);
+        particle.tickNeighbours();
+
+        change.to = new Vector2Int(x, y);
+        return change;
     }
 
     public void CalculateWindForce() {

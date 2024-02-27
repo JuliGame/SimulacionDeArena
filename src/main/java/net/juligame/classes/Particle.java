@@ -2,10 +2,10 @@ package net.juligame.classes;
 
 import net.juligame.Main;
 import net.juligame.Window;
+import net.juligame.classes.threading.TileMapChanges;
 import net.juligame.classes.utils.ColorUtils;
 import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
-import net.juligame.classes.utils.Vector2Int;
 
 import java.awt.*;
 
@@ -50,7 +50,7 @@ public class Particle {
 
     public static Vector2 WindForce = new Vector2(0, 0);
     public static Vector2 Gravity = Main.config.gravity;
-    public void tick() {
+    public TileMapChanges.TileMapChange tick() {
         if (System.currentTimeMillis() - burnAtUnix < 0) {
             float burn = (float) (burnAtUnix - System.currentTimeMillis()) / burnTime;
             burnVelocity.Multiply(burn);
@@ -66,8 +66,7 @@ public class Particle {
 
         velocity = velocity.Multiply(0.95f);
 
-        Window.tileMap.MoveTile(this);
-
+        return Window.tileMap.MoveTile(this);
     }
 
     public Particle getSide(Side side) {
@@ -82,17 +81,6 @@ public class Particle {
                 return Window.tileMap.getTile(x + 1, y);
         }
         return null;
-    }
-
-    public void updatePosition(int x, int y) {
-        if (x == this.x && y == this.y)
-            return;
-
-        tickAllNeighbours();
-
-        Window.tileMap.changeParticle(this, new Vector2Int(x, y));
-
-//        tickAllNeighbours();
     }
 
     public void tickNeighbours() {
