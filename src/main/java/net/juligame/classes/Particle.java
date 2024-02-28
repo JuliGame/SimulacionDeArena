@@ -3,15 +3,16 @@ package net.juligame.classes;
 import net.juligame.Main;
 import net.juligame.Window;
 import net.juligame.classes.threading.TileMapChanges;
-import net.juligame.classes.utils.ColorUtils;
 import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
+import net.juligame.classes.utils.Vector2Int;
 
 import java.awt.*;
+import java.util.List;
 
 public class Particle {
-//    public static int TILE_SIZE = 1;
-    public static int TILE_SIZE = 8;
+    public static int TILE_SIZE = 1;
+//    public static int TILE_SIZE = 8;
     public Color color;
     public Color colorOverlay = Color.BLACK;
     public Vector2 velocity = new Vector2(0, 0);
@@ -35,9 +36,6 @@ public class Particle {
         Window.tileMap.AddParticleToAddQueue(this);
     }
 
-    public void SendColorUpdate() {
-        Window.tileMap.ChangeColor(x, y, ColorUtils.addColors(color, colorOverlay).getRGB());
-    }
 
     private long burnAtUnix = 0;
     private int burnTime = 1;
@@ -69,54 +67,66 @@ public class Particle {
         return Window.tileMap.MoveTile(this);
     }
 
-    public Particle getSide(Side side) {
+    public Particle getSide(Side side, Vector2Int pos) {
         switch (side) {
             case TOP:
-                return Window.tileMap.getTile(x, y - 1);
+                return Window.tileMap.getTile(pos.x, pos.y - 1);
             case BOTTOM:
-                return Window.tileMap.getTile(x, y + 1);
+                return Window.tileMap.getTile(pos.x, pos.y + 1);
             case LEFT:
-                return Window.tileMap.getTile(x - 1, y);
+                return Window.tileMap.getTile(pos.x - 1, pos.y);
             case RIGHT:
-                return Window.tileMap.getTile(x + 1, y);
+                return Window.tileMap.getTile(pos.x + 1, pos.y);
         }
         return null;
     }
 
-    public void tickNeighbours() {
-        Side.getSides().forEach(side -> {
-            Particle tile = getSide(side);
-            if (tile == null)
-                return;
-
-            if (tile == this)
-                return;
-
-            if (tile.getID() == -1)
-                return;
-
-            Window.tileMap.AddParticleToTickQueue(tile);
-        });
-    }
-
-    public void tickAllNeighbours() {
+    public Particle[] getNeighbours(Vector2Int pos, boolean includeThis) {
         Particle[] tiles = new Particle[]{
-                Window.tileMap.getTile(x, y - 1),
-                Window.tileMap.getTile(x, y - 1),
-                Window.tileMap.getTile(x - 1, y),
-                Window.tileMap.getTile(x + 1, y),
-                Window.tileMap.getTile(x - 1, y - 1),
-                Window.tileMap.getTile(x + 1, y - 1),
-                Window.tileMap.getTile(x - 1, y + 1),
-                Window.tileMap.getTile(x + 1, y + 1),
+                Window.tileMap.getTile(pos.x, pos.y - 1),
+                Window.tileMap.getTile(pos.x, pos.y - 1),
+                Window.tileMap.getTile(pos.x - 1, pos.y),
+                Window.tileMap.getTile(pos.x + 1, pos.y)
         };
 
+        List<Particle> particles = new java.util.ArrayList<>();
         for (Particle tile : tiles) {
             if (tile == null || tile.getID() == -1)
                 continue;
 
-            Window.tileMap.AddParticleToTickQueue(tile);
+            particles.add(tile);
         }
+
+        if (includeThis)
+            particles.add(this);
+
+        return particles.toArray(new Particle[0]);
+    }
+
+    public  Particle[] getAllNeighbours(Vector2Int pos, boolean includeThis) {
+        Particle[] tiles = new Particle[]{
+                Window.tileMap.getTile(pos.x, pos.y - 1),
+                Window.tileMap.getTile(pos.x, pos.y - 1),
+                Window.tileMap.getTile(pos.x - 1, pos.y),
+                Window.tileMap.getTile(pos.x + 1, pos.y),
+                Window.tileMap.getTile(pos.x - 1, pos.y - 1),
+                Window.tileMap.getTile(pos.x + 1, pos.y - 1),
+                Window.tileMap.getTile(pos.x - 1, pos.y + 1),
+                Window.tileMap.getTile(pos.x + 1, pos.y + 1),
+        };
+
+        List<Particle> particles = new java.util.ArrayList<>();
+        for (Particle tile : tiles) {
+            if (tile == null || tile.getID() == -1)
+                continue;
+
+            particles.add(tile);
+        }
+
+        if (includeThis)
+            particles.add(this);
+
+        return particles.toArray(new Particle[0]);
     }
     public static int idCounter = 0;
     public int id;

@@ -10,7 +10,7 @@ public class Config {
     @ShowVar
     public float hue;
     @ShowVar(editable = true, callback = "onGravityChanged")
-    public Vector2 gravity = new Vector2(0, 0.14f);
+    public Vector2 gravity = new Vector2(0, .14f);
     public void onGravityChanged() {
         Window.tileMap.particles.forEach(p -> {
             p.velocity.y = 0;

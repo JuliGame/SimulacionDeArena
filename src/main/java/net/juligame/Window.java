@@ -18,6 +18,7 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringJoiner;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -130,14 +131,40 @@ public class Window {
     public static int TicksPerSecond = 60;
     private float timePerTick = 1000000000f / TicksPerSecond;
     public void simulation() {
+        lastUnixTime = System.nanoTime();
+        List<Integer> lastTps = new ArrayList<>();
+
+        long lastAddedTpsToList = System.currentTimeMillis();
+        int tps = TicksPerSecond * 100;
+        Main.debug.TPS = tps;
+
         while (true) {
+            // make an estimate of the TPs of the last 10 seconds
+            if (System.currentTimeMillis() - lastAddedTpsToList > 1000) {
+                lastAddedTpsToList = System.currentTimeMillis();
+                lastTps.add(tps);
+                if (lastTps.size() > 10)
+                    lastTps.remove(0);
+
+                int sum = 0;
+                for (int i : lastTps)
+                    sum += i;
+
+                Main.debug.TPS = sum / lastTps.size();
+            }
+
             if (System.nanoTime() - lastUnixTime < timePerTick)
                 continue;
 
+            if (Main.debug.TPS < 55 && !Main.debug.isPaused) {
+                System.out.println("Low TPS: " + Main.debug.TPS + " took " + (int) ((System.nanoTime() - lastUnixTime) / 1000000f) + "ms");
+//                tileMap.Pause();
+            }
 
-            tileMap.Tick();
-            Main.debug.TPS = Math.round(1000000000f / (System.nanoTime() - lastUnixTime));
+            tps = Math.round(1000000000f / (System.nanoTime() - lastUnixTime));
+
             lastUnixTime = System.nanoTime();
+            tileMap.Tick(false);
         }
     }
 
@@ -156,6 +183,7 @@ public class Window {
     boolean spacePressed = false;
     int fps = 0;
     long lastFrameShowFPS = System.currentTimeMillis();
+    boolean leftPressed = false;
     public void run() {
         if (System.currentTimeMillis() - lastFrameShowFPS > 1000) {
             Main.debug.FPS = fps;
@@ -179,10 +207,9 @@ public class Window {
 
         boolean isPressed = glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
         if (isPressed) {
-            // detect alt key
-            if (glfwGetKey(windowID, GLFW_KEY_LEFT_ALT) == GLFW_PRESS || glfwGetKey(windowID, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS)
-                TileMapChanges.findFreSpot(new Vector2Int(mouseX, mouseY), true);
-            else
+//            if (glfwGetKey(windowID, GLFW_KEY_LEFT_ALT) == GLFW_PRESS || glfwGetKey(windowID, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS)
+//                TileMapChanges.findFreSpot(new Vector2Int(mouseX, mouseY));
+//            else
                 press(mouseX, mouseY);
         }
         else
@@ -209,6 +236,15 @@ public class Window {
             spacePressed = false;
         }
 
+        // detect right arrow
+        if (glfwGetKey(windowID, GLFW_KEY_RIGHT) == GLFW_PRESS ) {
+            if (!leftPressed)
+                tileMap.Tick(true);
+
+            leftPressed = true;
+        }
+        else
+            leftPressed = false;
 
         if (!simThread.isAlive())
             StartSimThread();

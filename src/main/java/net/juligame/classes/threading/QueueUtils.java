@@ -1,23 +1,19 @@
 package net.juligame.classes.threading;
 
+import net.juligame.classes.Particle;
+
 import java.util.List;
 
 public class QueueUtils {
     
     
 
-    public static List[] splitQueue(List queue, int size) {
-        List[] queues = new List[size];
-        int i = 0;
-        while (!queue.isEmpty()) {
-            if (queues[i] == null) {
-                queues[i] = new java.util.LinkedList<>();
-            }
-            queues[i].add(queue.remove(0));
-            i++;
-            if (i == size) {
-                i = 0;
-            }
+    public static List<Particle>[] splitQueue(List<Particle> queue, int size) {
+        // We divide the queue into smaller queues of size "size"
+
+        List<Particle>[] queues = new List[size];
+        for (int i = 0; i < size; i++) {
+            queues[i] = queue.subList(i * queue.size() / size, (i + 1) * queue.size() / size);
         }
         return queues;
     }
