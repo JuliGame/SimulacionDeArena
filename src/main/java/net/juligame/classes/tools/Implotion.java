@@ -20,35 +20,24 @@ public class Implotion {
         }
     }
     public static void Implode(int x, int y, float size) {
-        size = size * 4;
-        List<Info> particles = new ArrayList<>();
-        for (int i = (int) -size; i < size; i++) {
-            for (int j = (int) -size; j < size; j++) {
-                float distance = (float) Math.sqrt(i * i + j * j);
-                if (size <= distance)
-                    continue;
-
-
-                Particle particle =  Window.tileMap.getTile(x + i, y + j);
-                if (particle == null || particle.getID() == -1)
-                    continue;
-
-                Info info = new Info(particle, distance, new Vector2(i, j).Normalize().Invert());
-                particles.add(info);
-            }
-        }
-
-        // sort particles by distance, further to closer
-        particles.sort((o1, o2) -> Float.compare(o1.distance, o2.distance));
-
+        size = size * 1.3f;
         float finalSize = size;
+
+        List<Explotion.Info> particles = Explotion.CalculateQuarterCircle(x, y, size);
+
         particles.forEach(info -> {
-            float force = finalSize / Math.max(info.distance, 1);
-//            force = Math.max(force, 1f);
+            float force = finalSize * 5 / Math.max(info.distance, 1);
+            force = -Math.min(force, 30);
 
             Particle particle = info.particle;
-            particle.velocity = info.direction.Multiply(force);
-            Window.tileMap.AddParticleToTickQueue(particle);
+            particle.SetVelocityWithTimeBurn(info.direction.Multiply(force), Window.TicksPerSecond * 3);
         });
+
+        Window.tileMap.AddSyncTask(() -> {
+            particles.forEach(info -> {
+                Window.tileMap.AddParticleToTickQueue(info.particle);
+            });
+        });
+
     }
 }

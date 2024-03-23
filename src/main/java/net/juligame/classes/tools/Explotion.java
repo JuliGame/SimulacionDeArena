@@ -4,6 +4,7 @@ import net.juligame.Window;
 import net.juligame.classes.Particle;
 import net.juligame.classes.utils.ColorUtils;
 import net.juligame.classes.utils.Vector2;
+import net.juligame.classes.utils.Vector2Int;
 
 import java.awt.*;
 import java.util.ArrayList;
@@ -11,7 +12,7 @@ import java.util.List;
 
 public class Explotion {
 
-    private static class Info {
+    public static class Info {
         public Particle particle;
         public float distance;
         public Vector2 direction;
@@ -28,24 +29,46 @@ public class Explotion {
     // ordenar las listas es carardo, asi que mejor hacerlo en cuartos
     // que al ser un circulo es muy parecido el resultado.
 
-    public static void Explode(int x, int y, float size) {
-        size = size * 1.3f;
+    public static void Explode(int x, int y, float brushSize) {
+        float size = brushSize * 1.3f;
 
         List<Info> particles = CalculateQuarterCircle(x, y, size);
 
         // sort particles by distance, further to closer
 //        particles.sort((o1, o2) -> Float.compare(o2.distance, o1.distance));
 
-        float finalSize = size;
         particles.forEach(info -> {
-            float force = finalSize * 5 / Math.max(info.distance, 1);
+            float force = size * size * 0.5f / Math.max(info.distance, 1);
             force = Math.min(force, 30);
 //            force = finalSize / 10;
 
             Particle particle = info.particle;
-            particle.SetVelocityWithTimeBurn(info.direction.Multiply(force), 1000);
-            Window.tileMap.AddParticleToTickQueue(particle);
+            particle.SetVelocityWithTimeBurn(info.direction.Multiply(force), Window.TicksPerSecond * 10);
         });
+
+        System.out.println(particles.size());
+
+        if (brushSize >= 25) {
+            for (Info info : new ArrayList<>(particles)) {
+                Vector2Int pos = new Vector2Int(info.particle.x, info.particle.y);
+                int neighbours = info.particle.getNeighbours(pos, false).length;
+//                System.out.println("N: " + neighbours);
+                if (neighbours != 4)
+                    continue;
+
+                particles.remove(info);
+            }
+        }
+
+        System.out.println(particles.size());
+
+        Window.tileMap.AddSyncTask(() -> {
+            particles.forEach(info -> {
+                Window.tileMap.AddParticleToTickQueue(info.particle);
+            });
+        });
+
+
     }
 
 

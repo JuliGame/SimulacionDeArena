@@ -38,7 +38,7 @@ public class Main extends Application {
     @Override
     public void process() {
         new ArrayList<>(menus).forEach(CreatingMenu::process);
-        window.run();
+        window.render();
 
         if (glfwGetKey(getHandle(), GLFW_KEY_C) == GLFW_PRESS)
             new CreatingMenu(config);

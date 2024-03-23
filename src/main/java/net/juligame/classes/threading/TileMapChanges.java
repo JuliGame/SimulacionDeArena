@@ -39,11 +39,15 @@ public class TileMapChanges {
     public static void removeParticle(Vector2Int pos) {
         particlesToRemove.add(pos);
     }
-    private static final List<TileMapChange> changes = new LinkedList<>();
+    public static final List<TileMapChange> changes = new LinkedList<>();
     public static void changeParticle(TileMapChange change) {
         changes.add(change);
     }
 
+
+    public static void RemoveParticle(int x, int y){
+        particles[x + y * WIDTH] = null;
+    }
     public static Particle[] Resove() {
 //        while (!particlesToRemove.isEmpty()) {
 //            Vector2Int pos = particlesToRemove.poll();
@@ -53,13 +57,9 @@ public class TileMapChanges {
 
 //        boolean[] fromBools = new boolean[WIDTH * HEIGHT];
 
-        List<Vector2Int> repainted = new LinkedList<>();
         for (TileMapChange c : changes) {
             Vector2Int from = new Vector2Int(c.particle.x, c.particle.y);
             particles[from.x + from.y * WIDTH] = null;
-//            Window.tileMap.ChangeColor(from.x, from.y, Color.BLACK.getRGB());
-
-//            fromBools[from.x + from.y * WIDTH] = true;
         }
 
         while (!particlesToAdd.isEmpty()) {

@@ -11,8 +11,8 @@ import java.awt.*;
 import java.util.List;
 
 public class Particle {
-    public static int TILE_SIZE = 1;
-//    public static int TILE_SIZE = 8;
+//    public static int TILE_SIZE = 1;
+    public static int TILE_SIZE = 2;
     public Color color;
     public Color colorOverlay = Color.BLACK;
     public Vector2 velocity = new Vector2(0, 0);
@@ -37,20 +37,20 @@ public class Particle {
     }
 
 
-    private long burnAtUnix = 0;
+    private int burnAtTick = 0;
     private int burnTime = 1;
     public Vector2 burnVelocity = new Vector2(0, 0);
-    public void SetVelocityWithTimeBurn(Vector2 velocity, int burnIn) {
+    public void SetVelocityWithTimeBurn(Vector2 velocity, int burnInTicks) {
         burnVelocity = velocity;
-        this.burnAtUnix = System.currentTimeMillis() + burnIn;
-        this.burnTime = burnIn;
+        this.burnAtTick = Window.tileMap.tick + burnInTicks;
+        this.burnTime = burnInTicks;
     }
 
     public static Vector2 WindForce = new Vector2(0, 0);
     public static Vector2 Gravity = Main.config.gravity;
     public TileMapChanges.TileMapChange tick() {
-        if (System.currentTimeMillis() - burnAtUnix < 0) {
-            float burn = (float) (burnAtUnix - System.currentTimeMillis()) / burnTime;
+        if (Window.tileMap.tick - burnAtTick < 0) {
+            float burn = (float) (burnAtTick - Window.tileMap.tick) / burnTime;
             burnVelocity.Multiply(burn);
         } else {
             burnVelocity = new Vector2(0, 0);

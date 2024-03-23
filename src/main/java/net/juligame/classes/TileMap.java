@@ -2,11 +2,13 @@ package net.juligame.classes;
 
 import net.juligame.Main;
 import net.juligame.Window;
+import net.juligame.classes.threading.ThreadResult;
 import net.juligame.classes.threading.TileMapChanges;
 import net.juligame.classes.utils.ColorUtils;
 import net.juligame.classes.utils.Side;
 import net.juligame.classes.utils.Vector2;
 import net.juligame.classes.utils.Vector2Int;
+import org.javatuples.Pair;
 
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -47,7 +49,7 @@ public class TileMap {
 
         TileMapChanges.setTilemap(width, height);
 
-        if (benchmark) {
+        if (Main.config.benchmark) {
             boolean[] occupied = new boolean[width * height];
             for (int i = 0; i < (width * height) / 20f;) {
                 int x = randomClass.nextInt(width - 1);
@@ -75,6 +77,7 @@ public class TileMap {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, b);
     }
     private int lastRedrawTick = 0;
+    public static HashMap<Vector2Int, Pair<Integer, Integer>> debugDraws = new HashMap<>();
     public void reDrawTexture() {
         if (lastRedrawTick == tick)
             return;
@@ -85,6 +88,16 @@ public class TileMap {
                 continue;
 
             colors[particle.x + particle.y * width] = particle.color.getRGB();
+        }
+
+        for (Map.Entry<Vector2Int, Pair<Integer, Integer>> entry : new ArrayList<>(debugDraws.entrySet())) {
+            Vector2Int key = entry.getKey();
+            Pair<Integer, Integer> value = entry.getValue();
+            colors[key.x + key.y * width] = value.getValue0();
+            if (value.getValue1() <= 1)
+                debugDraws.remove(key);
+            else
+                debugDraws.put(key, Pair.with(value.getValue0(), value.getValue1() - 1));
         }
 
         for (int color : colors) {
@@ -105,6 +118,13 @@ public class TileMap {
     }
 
     public void draw(){
+//        DebugDraw.drawPoint(new Vector2Int(width / 2, height / 2), 10, 0xFF0000);
+
+        Vector2Int forceRepresentation = new Vector2Int((int) ((Particle.WindForce.x + Particle.Gravity.x) * 50) , (int) ((Particle.WindForce.y + Particle.Gravity.y) * 50));
+        DebugDraw.drawLine(new Vector2Int(width / 2, height / 2), new Vector2Int(width / 2 + forceRepresentation.x, height / 2 + forceRepresentation.y), 0, ColorUtils.GetColor(((float) tick / Window.TicksPerSecond) * .1f, 1f,.7f).getRGB(), 10);
+
+        DebugDraw.drawRect(new Vector2Int(width / 2 - 25, height / 2 - 25), new Vector2Int(width / 2 + 25, height / 2 + 25), 0, 0xFFFFFF, 0);
+
         glBindTexture(GL_TEXTURE_2D, tex);
         glClear(GL_COLOR_BUFFER_BIT);
         glPushMatrix();
@@ -121,8 +141,8 @@ public class TileMap {
         glEnd();
 
         glBindTexture(GL_TEXTURE_2D, 0);
-
         glPopMatrix();
+
     }
     // endregion
 
@@ -137,13 +157,13 @@ public class TileMap {
         ctrlZ = true;
     }
     public ArrayList<ArrayList<Particle>> history = new ArrayList<>();
+    private final Queue<Runnable> tasksToRunOnThreadFinish = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private final Queue<Particle> queuedParticlesToAdd = new java.util.concurrent.ConcurrentLinkedQueue<>();
     public List<Particle> queuedParticlesToTick = new ArrayList<>();
     public float[] randomFloatOfThisTick = new float[100];
-    public int threads = 10;
+    public int threads = 15;
     boolean[] alreadyAddedToTickQueue2;
     ExecutorService executor = Executors.newFixedThreadPool(threads);
-    boolean benchmark = true;
     public void Tick(boolean force) {
         Main.debug.isPaused = paused;
 
@@ -205,23 +225,52 @@ public class TileMap {
         CalculateWindForce();
 
 
-        List<Future<List<TileMapChanges.TileMapChange>>> futures = new ArrayList<>(threads);
+        List<Future<ThreadResult>> futures = new ArrayList<>(threads);
+        List<Particle> toTickClone = new ArrayList<>(this.queuedParticlesToTick);
+
+        // shuffle toTickClone. Lo mezclamos para que sea uniform el tickeo.
+        Collections.shuffle(toTickClone);
+
         for (int threadID = 0; threadID < threads; threadID++) {
-            List<Particle> toTickClone = new ArrayList<>(this.queuedParticlesToTick);
+
             int finalThreadID = threadID;
-            Future<List<TileMapChanges.TileMapChange>> future = executor.submit(() ->{
+
+            Future<ThreadResult> future = executor.submit(() ->{
                 List<TileMapChanges.TileMapChange> particles = new ArrayList<>();
                 int remainder = toTickClone.size() % threads;
                 int ammount = (int) Math.floor((double) toTickClone.size() / threads);
                 if (finalThreadID < remainder)
                     ammount++;
 
+                boolean[] added = new boolean[width * height];
+                ArrayList<Particle> particlesToTick = new ArrayList<>();
+
                 for (int j = 0; j < ammount; j++) {
                     int index = j * threads + finalThreadID;
-                    particles.add(toTickClone.get(index).tick());
+                    Particle particle = toTickClone.get(index);
+                    int x = particle.x;
+                    int y = particle.y;
+
+                    TileMapChanges.TileMapChange change = particle.tick();
+
+
+                    particles.add(change);
+
+
+                    if (change.particlesToUpdate != null){
+                        for (Particle particleToUpdate : change.particlesToUpdate) {
+                            if (added[particleToUpdate.getID()])
+                                continue;
+
+                            added[particleToUpdate.getID()] = true;
+                            particlesToTick.add(particleToUpdate);
+                        }
+                    }
+
+                    continue;
                 }
 
-                return particles;
+                return new ThreadResult(particles, particlesToTick);
             });
 
             futures.add(future);
@@ -231,31 +280,21 @@ public class TileMap {
         this.queuedParticlesToTick = new ArrayList<>(width * height);
 
         int processedCount = 0;
+        long startMS = System.currentTimeMillis();
+
         while (processedCount != threads) {
-            boolean[] alreadyAddedToTickQueue = new boolean[width * height];
-            for (Future<List<TileMapChanges.TileMapChange>> future : new ArrayList<>(futures)) {
+            for (Future<ThreadResult> future : new ArrayList<>(futures)) {
                 if (!future.isDone())
                     continue;
 
-
                 try {
-                    List<TileMapChanges.TileMapChange> changes = future.get();
+                    ThreadResult threadResult = future.get();
 
-                    for (TileMapChanges.TileMapChange change : changes) {
-                        TileMapChanges.changeParticle(change);
+                    TileMapChanges.changes.addAll(threadResult.changes);
 
-                        // optimizar esto, podemos hacer en el multi thread chequear que no este ya para tickear este.
-                        if (change.particlesToUpdate == null)
-                            continue;
+                    for (Particle particleToUpdate : threadResult.particlesToUpdate)
+                        AddParticleToTickQueue(particleToUpdate);
 
-                        for (Particle particleToUpdate : change.particlesToUpdate) {
-                            if (alreadyAddedToTickQueue[particleToUpdate.getID()])
-                                continue;
-
-                            alreadyAddedToTickQueue[particleToUpdate.getID()] = true;
-                            AddParticleToTickQueue(particleToUpdate);
-                        }
-                    }
                     futures.remove(future);
                     processedCount++;
                 } catch (Exception e) {
@@ -269,6 +308,10 @@ public class TileMap {
 //        if (benchmark)
 //            queuedParticlesToTick = new ArrayList<>(particles);
 
+        for (Runnable runnable : tasksToRunOnThreadFinish) {
+            runnable.run();
+        }
+        tasksToRunOnThreadFinish.clear();
     }
 
     private boolean[] alreadyAddedToTickQueue;
@@ -283,6 +326,9 @@ public class TileMap {
 
     public void AddParticleToAddQueue(Particle particle) {
         queuedParticlesToAdd.add(particle);
+    }
+    public void AddSyncTask(Runnable runnable) {
+        tasksToRunOnThreadFinish.add(runnable);
     }
     // endregion
 

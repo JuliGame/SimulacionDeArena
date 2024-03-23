@@ -25,4 +25,7 @@ public class Config {
     public void onWindForceChanged() {
         System.out.println("Wind corce changed");
     }
+
+    @ShowVar
+    public boolean benchmark = false;
 }

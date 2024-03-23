@@ -2,6 +2,7 @@ package net.juligame.classes.logic;
 
 import imgui.ImGui;
 import imgui.flag.ImGuiWindowFlags;
+import jdk.nashorn.internal.ir.SplitReturn;
 import net.juligame.Main;
 import net.juligame.classes.logic.ZEscapeAPI.EditorUtils;
 
@@ -30,6 +31,7 @@ public class CreatingMenu {
         this.edited = edited;
     }
 
+    public boolean FocusedOrHovered = false;
     public void process() {
         ImGui.begin("Creator Menu - " + name + "##" + edited.hashCode(), ImGuiWindowFlags.AlwaysAutoResize);
         try {
@@ -37,6 +39,8 @@ public class CreatingMenu {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        FocusedOrHovered = ImGui.isWindowFocused() || ImGui.isWindowHovered();
+
         ImGui.end();
     }
 

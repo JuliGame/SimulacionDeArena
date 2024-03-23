@@ -3,7 +3,7 @@ package net.juligame;
 import imgui.ImGui;
 import net.juligame.classes.Particle;
 import net.juligame.classes.TileMap;
-import net.juligame.classes.threading.TileMapChanges;
+import net.juligame.classes.logic.CreatingMenu;
 import net.juligame.classes.tools.Explotion;
 import net.juligame.classes.tools.Implotion;
 import net.juligame.classes.utils.ColorUtils;
@@ -18,26 +18,24 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.StringJoiner;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Window {
-    private long windowID;
+    private final long windowID;
     public static TileMap tileMap;
     public static int texture;
 
     public Window(Main application) {
-        if (!glfwInit()) {
+        if (!glfwInit())
             throw new IllegalStateException("Failed to initialize GLFW");
-        }
+
 
         this.windowID = application.getHandle();
-        if (windowID == 0) {
+        if (windowID == 0)
             throw new RuntimeException("Failed to create the GLFW window");
-        }
+
 
         glfwMakeContextCurrent(windowID); // Make the OpenGL context current
         GL.createCapabilities();
@@ -51,6 +49,7 @@ public class Window {
         tileMap = new TileMap(width / Particle.TILE_SIZE, height / Particle.TILE_SIZE);
 
         StartSimThread();
+        StartInputThread();
 
         glfwSetCursorPosCallback(windowID, (window, xpos, ypos) -> {
             mouseX = (int) Math.floor(xpos / Particle.TILE_SIZE);
@@ -157,7 +156,7 @@ public class Window {
                 continue;
 
             if (Main.debug.TPS < 55 && !Main.debug.isPaused) {
-                System.out.println("Low TPS: " + Main.debug.TPS + " took " + (int) ((System.nanoTime() - lastUnixTime) / 1000000f) + "ms");
+//                System.out.println("Low TPS: " + Main.debug.TPS + " took " + (int) ((System.nanoTime() - lastUnixTime) / 1000000f) + "ms");
 //                tileMap.Pause();
             }
 
@@ -180,11 +179,11 @@ public class Window {
         glEnable(GL_TEXTURE_2D);
     }
 
-    boolean spacePressed = false;
+
     int fps = 0;
     long lastFrameShowFPS = System.currentTimeMillis();
-    boolean leftPressed = false;
-    public void run() {
+
+    public void render() {
         if (System.currentTimeMillis() - lastFrameShowFPS > 1000) {
             Main.debug.FPS = fps;
             lastFrameShowFPS = System.currentTimeMillis();
@@ -196,58 +195,80 @@ public class Window {
         tileMap.reDrawTexture();
         tileMap.draw();
 
-        if (glfwGetKey(windowID, GLFW_KEY_R) == GLFW_PRESS){
-            tileMap.Reset();
-            System.out.println("Reset");
-        }
+        if (!simThread.isAlive())
+            StartSimThread();
+    }
 
-        //  || ImGui.isItemHovered() ||
-        if (ImGui.isWindowFocused() || ImGui.isWindowHovered())
-            return;
 
-        boolean isPressed = glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-        if (isPressed) {
+    boolean spacePressed = false;
+    boolean leftPressed = false;
+    Thread inputThread;
+    public void StartInputThread() {
+        inputThread = new Thread(this::input);
+        inputThread.setName("Input Thread");
+        inputThread.start();
+    }
+
+    public void input() {
+        long lastInput = System.nanoTime();
+        BigLoop:
+        while (true) {
+            if (System.nanoTime() - lastInput < 1000000000f / 120)
+                continue;
+
+            lastInput = System.nanoTime();
+
+            if (glfwGetKey(windowID, GLFW_KEY_R) == GLFW_PRESS){
+                tileMap.Reset();
+                System.out.println("Reset");
+            }
+
+            for (CreatingMenu menu : Main.instance.menus)
+                if (menu.FocusedOrHovered)
+                    continue BigLoop;
+
+
+            boolean isPressed = glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+            if (isPressed) {
 //            if (glfwGetKey(windowID, GLFW_KEY_LEFT_ALT) == GLFW_PRESS || glfwGetKey(windowID, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS)
 //                TileMapChanges.findFreSpot(new Vector2Int(mouseX, mouseY));
 //            else
                 press(mouseX, mouseY);
-        }
-        else
-            lastMousePos = null;
-
-
-        boolean isPressedRight = glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-        if (isPressedRight)
-            if (glfwGetKey(windowID, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(windowID, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
-                Implotion.Implode(mouseX, mouseY, Main.config.brushSize);
+            }
             else
-                Explotion.Explode(mouseX, mouseY, Main.config.brushSize);
+                lastMousePos = null;
 
 
-        if (glfwGetKey(windowID, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS && glfwGetKey(windowID, GLFW_KEY_Z) == GLFW_PRESS)
-            tileMap.SendCtrlZ();
+            boolean isPressedRight = glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+            if (isPressedRight)
+                if (glfwGetKey(windowID, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(windowID, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+                    Implotion.Implode(mouseX, mouseY, Main.config.brushSize);
+                else
+                    Explotion.Explode(mouseX, mouseY, Main.config.brushSize);
 
-        if (glfwGetKey(windowID, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            if (!spacePressed)
-                tileMap.Pause();
 
-            spacePressed = true;
-        } else {
-            spacePressed = false;
+            if (glfwGetKey(windowID, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS && glfwGetKey(windowID, GLFW_KEY_Z) == GLFW_PRESS)
+                tileMap.SendCtrlZ();
+
+            if (glfwGetKey(windowID, GLFW_KEY_SPACE) == GLFW_PRESS) {
+                if (!spacePressed)
+                    tileMap.Pause();
+
+                spacePressed = true;
+            } else {
+                spacePressed = false;
+            }
+
+            // detect right arrow
+            if (glfwGetKey(windowID, GLFW_KEY_RIGHT) == GLFW_PRESS ) {
+                if (!leftPressed)
+                    tileMap.Tick(true);
+
+                leftPressed = true;
+            }
+            else
+                leftPressed = false;
         }
-
-        // detect right arrow
-        if (glfwGetKey(windowID, GLFW_KEY_RIGHT) == GLFW_PRESS ) {
-            if (!leftPressed)
-                tileMap.Tick(true);
-
-            leftPressed = true;
-        }
-        else
-            leftPressed = false;
-
-        if (!simThread.isAlive())
-            StartSimThread();
     }
     Vector2Int lastMousePos = null;
     void press(int x, int y) {
