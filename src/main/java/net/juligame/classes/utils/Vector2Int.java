@@ -1,5 +1,7 @@
 package net.juligame.classes.utils;
 
+import net.juligame.Window;
+
 public class Vector2Int {
     public int x;
     public int y;
@@ -52,5 +54,10 @@ public class Vector2Int {
         if (o == null || getClass() != o.getClass()) return false;
         Vector2Int that = (Vector2Int) o;
         return x == that.x && y == that.y;
+    }
+
+    @Override
+    public int hashCode() {
+        return x + y * Window.tileMap.width;
     }
 }

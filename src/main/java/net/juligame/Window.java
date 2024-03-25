@@ -1,6 +1,5 @@
 package net.juligame;
 
-import imgui.ImGui;
 import net.juligame.classes.Particle;
 import net.juligame.classes.TileMap;
 import net.juligame.classes.logic.CreatingMenu;
@@ -201,6 +200,7 @@ public class Window {
 
 
     boolean spacePressed = false;
+    boolean resetPressed = false;
     boolean leftPressed = false;
     Thread inputThread;
     public void StartInputThread() {
@@ -218,10 +218,16 @@ public class Window {
 
             lastInput = System.nanoTime();
 
+
             if (glfwGetKey(windowID, GLFW_KEY_R) == GLFW_PRESS){
-                tileMap.Reset();
-                System.out.println("Reset");
+                if (!resetPressed)
+                    tileMap.Reset();
+
+                resetPressed = true;
+            } else {
+                resetPressed = false;
             }
+
 
             for (CreatingMenu menu : Main.instance.menus)
                 if (menu.FocusedOrHovered)

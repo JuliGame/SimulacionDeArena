@@ -12,11 +12,11 @@ public class Config {
     @ShowVar(editable = true, callback = "onGravityChanged")
     public Vector2 gravity = new Vector2(0, .14f);
     public void onGravityChanged() {
-        Window.tileMap.particles.forEach(p -> {
-            p.velocity.y = 0;
-            p.velocity.x = 0;
-            Window.tileMap.AddParticleToTickQueue(p);
-        });
+//        Window.tileMap.particles.forEach(p -> {
+//            p.velocity.y = 0;
+//            p.velocity.x = 0;
+//            Window.tileMap.AddParticleToTickQueue(p);
+//        });
         Particle.Gravity = gravity;
     }
 

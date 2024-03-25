@@ -20,14 +20,13 @@ import static org.lwjgl.opengl.GL11.*;
 
 
 public class TileMap {
-    public List<Particle> particles = new ArrayList<>();
+
     boolean queueReset = false;
     public void Reset() {
         queueReset = true;
     }
     public int width, height;
     public TileMap(int width, int height) {
-        tiles = new Particle[width * height];
         this.width = width;
         this.height = height;
         Window.tileMap = this;
@@ -36,8 +35,6 @@ public class TileMap {
     }
 
     private void InitializeThings(){
-        particles.clear();
-        tiles = new Particle[width * height];
         queuedParticlesToAdd.clear();
         queuedParticlesToTick.clear();
         Particle.idCounter = 0;
@@ -63,6 +60,13 @@ public class TileMap {
                 i++;
             }
         }
+
+        subTileMaps.clear();
+        for (int x = 0; x < 10; x++) {
+            for (int y = 0; y < 10; y++) {
+                subTileMaps.put(new Vector2Int(x, y), new SubTileMap(x, y));
+            }
+        }
     }
 
     // region Render
@@ -83,12 +87,20 @@ public class TileMap {
             return;
 
         int[] colors = new int[width * height];
-        for (Particle particle : new ArrayList<>(particles)) {
-            if (particle.x < 0 || particle.x >= width || particle.y < 0 || particle.y >= height)
-                continue;
+        for (Map.Entry<Vector2Int, SubTileMap> entry : subTileMaps.entrySet()) {
+            SubTileMap value = entry.getValue();
+            for (Particle particle : new ArrayList<>(value.particles)) {
+                if (particle == null)
+                    continue;
 
-            colors[particle.x + particle.y * width] = particle.color.getRGB();
+                if (particle.x < 0 || particle.x >= width || particle.y < 0 || particle.y >= height)
+                    continue;
+
+                colors[particle.x + particle.y * width] = particle.color.getRGB();
+            }
         }
+
+
 
         for (Map.Entry<Vector2Int, Pair<Integer, Integer>> entry : new ArrayList<>(debugDraws.entrySet())) {
             Vector2Int key = entry.getKey();
@@ -123,7 +135,12 @@ public class TileMap {
         Vector2Int forceRepresentation = new Vector2Int((int) ((Particle.WindForce.x + Particle.Gravity.x) * 50) , (int) ((Particle.WindForce.y + Particle.Gravity.y) * 50));
         DebugDraw.drawLine(new Vector2Int(width / 2, height / 2), new Vector2Int(width / 2 + forceRepresentation.x, height / 2 + forceRepresentation.y), 0, ColorUtils.GetColor(((float) tick / Window.TicksPerSecond) * .1f, 1f,.7f).getRGB(), 10);
 
-        DebugDraw.drawRect(new Vector2Int(width / 2 - 25, height / 2 - 25), new Vector2Int(width / 2 + 25, height / 2 + 25), 0, 0xFFFFFF, 0);
+        for (Map.Entry<Vector2Int, SubTileMap> entry : new ArrayList<>(subTileMaps.entrySet())) {
+            Vector2Int key = entry.getKey();
+            SubTileMap value = entry.getValue();
+            DebugDraw.drawRect(new Vector2Int(key.x * SubTileMap.width, key.y * SubTileMap.height), new Vector2Int(key.x * SubTileMap.width + SubTileMap.width, key.y * SubTileMap.height + SubTileMap.height), 0, 0xFFFFFF, 0);
+        }
+
 
         glBindTexture(GL_TEXTURE_2D, tex);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -161,7 +178,7 @@ public class TileMap {
     private final Queue<Particle> queuedParticlesToAdd = new java.util.concurrent.ConcurrentLinkedQueue<>();
     public List<Particle> queuedParticlesToTick = new ArrayList<>();
     public float[] randomFloatOfThisTick = new float[100];
-    public int threads = 15;
+    public int threads = 10;
     boolean[] alreadyAddedToTickQueue2;
     ExecutorService executor = Executors.newFixedThreadPool(threads);
     public void Tick(boolean force) {
@@ -180,7 +197,7 @@ public class TileMap {
                 for (Particle particle : h){
                     queuedParticlesToAdd.remove(particle);
                     queuedParticlesToTick.remove(particle);
-                    particles.remove(particle);
+//                    particles.remove(particle);
                     removeParticle(particle.x, particle.y);
 //                    particle.tickNeighbours();
                     Particle.idCounter--;
@@ -196,6 +213,7 @@ public class TileMap {
         while (!queuedParticlesToAdd.isEmpty()) {
             Particle particle = queuedParticlesToAdd.poll();
 
+
             if (getTile(particle.x, particle.y) != null)
                 continue;
 
@@ -205,7 +223,7 @@ public class TileMap {
             alreadyAddedToTickQueue2[particle.x + particle.y * width] = true;
 
             particle.id = Particle.idCounter++;
-            particles.add(particle);
+            addParticle(particle);
             AddParticleToTickQueue(particle);
             historial.add(particle);
         }
@@ -216,7 +234,7 @@ public class TileMap {
 
 
         Main.debug.TickingParticles = queuedParticlesToTick.size();
-        Main.debug.Particles = particles.size();
+        Main.debug.Particles = subTileMaps.values().stream().mapToInt(x -> x.particles.size()).sum();
 
         if (paused && !force)
             return;
@@ -224,50 +242,81 @@ public class TileMap {
         tick++;
         CalculateWindForce();
 
-
+        long startMS = System.currentTimeMillis();
         List<Future<ThreadResult>> futures = new ArrayList<>(threads);
-        List<Particle> toTickClone = new ArrayList<>(this.queuedParticlesToTick);
 
-        // shuffle toTickClone. Lo mezclamos para que sea uniform el tickeo.
-        Collections.shuffle(toTickClone);
+        queuedParticlesToTick.forEach( toTick -> {
+            SubTileMap subTileMap = subTileMaps.get(getSubTileMapPos(new Vector2Int(toTick.x, toTick.y)).getValue0());
+            subTileMap.particlesToTick.add(toTick);
+        });
 
+        int subTileMapsSize = subTileMaps.size();
         for (int threadID = 0; threadID < threads; threadID++) {
 
             int finalThreadID = threadID;
 
             Future<ThreadResult> future = executor.submit(() ->{
-                List<TileMapChanges.TileMapChange> particles = new ArrayList<>();
-                int remainder = toTickClone.size() % threads;
-                int ammount = (int) Math.floor((double) toTickClone.size() / threads);
+                List<TileMapChanges.TileMapChange> particles = new ArrayList<>(SubTileMap.width * 2 + SubTileMap.height * 2);
+                int remainder = subTileMapsSize % threads;
+                int ammount = (int) Math.floor((double) subTileMapsSize / threads);
                 if (finalThreadID < remainder)
                     ammount++;
 
                 boolean[] added = new boolean[width * height];
                 ArrayList<Particle> particlesToTick = new ArrayList<>();
 
-                for (int j = 0; j < ammount; j++) {
-                    int index = j * threads + finalThreadID;
-                    Particle particle = toTickClone.get(index);
-                    int x = particle.x;
-                    int y = particle.y;
+                for (int subNum = 0; subNum < ammount; subNum++) {
+                    int index = subNum * threads + finalThreadID;
+                    SubTileMap subTileMap = subTileMaps.entrySet().stream().skip(index).findFirst().get().getValue();
+                    Particle[] tilesFinal = subTileMap.tiles.clone();
 
-                    TileMapChanges.TileMapChange change = particle.tick();
+                    subTileMap.particlesToTick.forEach(particle -> {
+                        int x = particle.x;
+                        int y = particle.y;
 
+                        TileMapChanges.TileMapChange change = particle.tick();
 
-                    particles.add(change);
+                        if (change.particlesToUpdate != null){
+                            for (Particle particleToUpdate : change.particlesToUpdate) {
+                                if (added[particleToUpdate.getID()])
+                                    continue;
 
-
-                    if (change.particlesToUpdate != null){
-                        for (Particle particleToUpdate : change.particlesToUpdate) {
-                            if (added[particleToUpdate.getID()])
-                                continue;
-
-                            added[particleToUpdate.getID()] = true;
-                            particlesToTick.add(particleToUpdate);
+                                added[particleToUpdate.getID()] = true;
+                                particlesToTick.add(particleToUpdate);
+                            }
                         }
-                    }
 
-                    continue;
+                        if (particle.x == change.to.x && particle.y == change.to.y) {
+//                            System.out.println("Particle didn't move");
+                            change.particle = null;
+                            return;
+                        }
+
+
+                        Vector2Int subTileMapStart = new Vector2Int((int) Math.floor((float) x / SubTileMap.width), (int) Math.floor((float) y / SubTileMap.height));
+                        Vector2Int subTileMapEnd = new Vector2Int((int) Math.floor((float) change.to.x / SubTileMap.width), (int) Math.floor((float) change.to.y / SubTileMap.height));
+
+                        if (subTileMapStart.equals(subTileMapEnd)) {
+                            if (tilesFinal[change.to.x % SubTileMap.width + (change.to.y % SubTileMap.height) * SubTileMap.width] != null)
+                                return;
+
+
+                            tilesFinal[x % SubTileMap.width + (y % SubTileMap.height) * SubTileMap.width] = null;
+                            tilesFinal[change.to.x % SubTileMap.width + (change.to.y % SubTileMap.height) * SubTileMap.width] = particle;
+                            particle.x = change.to.x;
+                            particle.y = change.to.y;
+
+                            change.particle = null;
+                            return;
+                        }
+
+                        particles.add(change);
+                        change.subTileMapFrom = subTileMap;
+                        change.subTileMapTo = subTileMaps.get(subTileMapEnd);
+                    });
+
+                    subTileMap.tiles = tilesFinal;
+                    subTileMap.particlesToTick.clear();
                 }
 
                 return new ThreadResult(particles, particlesToTick);
@@ -279,9 +328,8 @@ public class TileMap {
         alreadyAddedToTickQueue = new boolean[width * height];
         this.queuedParticlesToTick = new ArrayList<>(width * height);
 
+        long startWaitMS = System.currentTimeMillis();
         int processedCount = 0;
-        long startMS = System.currentTimeMillis();
-
         while (processedCount != threads) {
             for (Future<ThreadResult> future : new ArrayList<>(futures)) {
                 if (!future.isDone())
@@ -303,15 +351,16 @@ public class TileMap {
             }
         }
 
-        tiles = TileMapChanges.Resove();
+        Main.debug.UnresolvedParticles = TileMapChanges.changes.size();
+        TileMapChanges.Resove();
+        Main.debug.MS = (System.currentTimeMillis() - startWaitMS) + " " + (System.currentTimeMillis() - startMS);
 
-//        if (benchmark)
-//            queuedParticlesToTick = new ArrayList<>(particles);
-
-        for (Runnable runnable : tasksToRunOnThreadFinish) {
+        for (Runnable runnable : tasksToRunOnThreadFinish)
             runnable.run();
-        }
+
         tasksToRunOnThreadFinish.clear();
+
+
     }
 
     private boolean[] alreadyAddedToTickQueue;
@@ -331,25 +380,55 @@ public class TileMap {
         tasksToRunOnThreadFinish.add(runnable);
     }
     // endregion
-
-
-    public Particle[] tiles;
-    private final Particle voidParticle = new Particle();
-    public Particle getTile(int x, int y) {
-        if (x < 0 || x >= width || y < 0 || y >= height) {
-            return voidParticle;
-        }
-
-        return tiles[x + y * width];
+    public HashMap<Vector2Int, SubTileMap> subTileMaps = new HashMap<>();
+    public Pair<Vector2Int, Vector2Int> getSubTileMapPos(Vector2Int pos) {
+        Vector2Int subTileMapPos = new Vector2Int((int) Math.floor((float) pos.x / SubTileMap.width), (int) Math.floor((float) pos.y / SubTileMap.height));
+        Vector2Int localPos = new Vector2Int(pos.x % SubTileMap.width, pos.y % SubTileMap.height);
+        return new Pair<Vector2Int, Vector2Int>(subTileMapPos, localPos);
     }
+    public Particle getTile(int x, int y) {
+        Pair<Vector2Int, Vector2Int> subTileMapPos = getSubTileMapPos(new Vector2Int(x, y));
+
+        SubTileMap subTileMap = subTileMaps.get(subTileMapPos.getValue0());
+        if (subTileMap == null)
+            return SubTileMap.voidParticle;
+
+        return subTileMap.getLocalTile(subTileMapPos.getValue1());
+    }
+
     public void addParticle(Particle particle) {
-        TileMapChanges.addParticle(particle);
+        Pair<Vector2Int, Vector2Int> subTileMapPos = getSubTileMapPos(new Vector2Int(particle.x, particle.y));
+
+        SubTileMap subTileMap = subTileMaps.get(subTileMapPos.getValue0());
+        if (subTileMap == null)
+            return;
+
+        subTileMap.addParticle(particle);
+    }
+    public void moveParticle(Particle particle, Vector2Int to) {
+        Pair<Vector2Int, Vector2Int> subTileMapPosFrom = getSubTileMapPos(new Vector2Int(particle.x, particle.y));
+        SubTileMap fromSubTileMap = subTileMaps.get(subTileMapPosFrom.getValue0());
+        if (fromSubTileMap == null)
+            return;
+
+        Pair<Vector2Int, Vector2Int> subTileMapPosTo = getSubTileMapPos(new Vector2Int(to.x, to.y));
+        SubTileMap toSubTileMap = subTileMaps.get(subTileMapPosTo.getValue0());
+        if (toSubTileMap == null)
+            return;
+
+        fromSubTileMap.removeParticle(particle.x, particle.y);
+        particle.x = to.x;
+        particle.y = to.y;
+        toSubTileMap.addParticle(particle);
     }
     public void removeParticle(int x, int y) {
-        TileMapChanges.removeParticle(new Vector2Int(x, y));
-    }
-    public void changeParticle(Particle particle, Vector2Int to) {
-        TileMapChanges.changeParticle(new TileMapChanges.TileMapChange(particle, to));
+        Pair<Vector2Int, Vector2Int> subTileMapPos = getSubTileMapPos(new Vector2Int(x, y));
+
+        SubTileMap subTileMap = subTileMaps.getOrDefault(subTileMapPos.getValue0(), null);
+        if (subTileMap == null)
+            return;
+
+        subTileMap.removeParticle(x, y);
     }
 
     // region physics
@@ -446,6 +525,16 @@ public class TileMap {
                 return change;
         }
 
+        if (Main.config.benchmark){
+            if (x == 0)
+                x = width - 2;
+            if (y == 0)
+                y = height - 2;
+            if (x == width - 1)
+                x = 1;
+            if (y == height - 1)
+                y = 1;
+        }
 
         change.to = new Vector2Int(x, y);
         change.particlesToUpdate = particle.getNeighbours(new Vector2Int(particle.x, particle.y), true);

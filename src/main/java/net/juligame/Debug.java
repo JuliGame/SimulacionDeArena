@@ -11,6 +11,10 @@ public class Debug {
     @ShowVar(editable = false)
     public int TickingParticles;
     @ShowVar(editable = false)
+    public int UnresolvedParticles;
+    @ShowVar(editable = false)
+    public String MS;
+    @ShowVar(editable = false)
     public int Particles;
     @ShowVar(editable = false)
     public boolean isPaused;
