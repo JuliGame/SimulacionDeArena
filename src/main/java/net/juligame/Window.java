@@ -6,6 +6,7 @@ import net.juligame.classes.logic.CreatingMenu;
 import net.juligame.classes.tools.Explotion;
 import net.juligame.classes.tools.Implotion;
 import net.juligame.classes.utils.ColorUtils;
+import net.juligame.classes.utils.Profiler;
 import net.juligame.classes.utils.Vector2;
 import net.juligame.classes.utils.Vector2Int;
 import org.lwjgl.opengl.GL;
@@ -130,36 +131,17 @@ public class Window {
     private float timePerTick = 1000000000f / TicksPerSecond;
     public void simulation() {
         lastUnixTime = System.nanoTime();
-        List<Integer> lastTps = new ArrayList<>();
 
-        long lastAddedTpsToList = System.currentTimeMillis();
-        int tps = TicksPerSecond * 100;
-        Main.debug.TPS = tps;
 
         while (true) {
             // make an estimate of the TPs of the last 10 seconds
-            if (System.currentTimeMillis() - lastAddedTpsToList > 1000) {
-                lastAddedTpsToList = System.currentTimeMillis();
-                lastTps.add(tps);
-                if (lastTps.size() > 10)
-                    lastTps.remove(0);
-
-                int sum = 0;
-                for (int i : lastTps)
-                    sum += i;
-
-                Main.debug.TPS = sum / lastTps.size();
-            }
+            Main.debug.TPS = Profiler.getAverage("tps");
 
             if (System.nanoTime() - lastUnixTime < timePerTick)
                 continue;
 
-            if (Main.debug.TPS < 55 && !Main.debug.isPaused) {
-//                System.out.println("Low TPS: " + Main.debug.TPS + " took " + (int) ((System.nanoTime() - lastUnixTime) / 1000000f) + "ms");
-//                tileMap.Pause();
-            }
+            Profiler.addValue("tps", Math.round(1000000000f / (System.nanoTime() - lastUnixTime)), 1000);
 
-            tps = Math.round(1000000000f / (System.nanoTime() - lastUnixTime));
 
             lastUnixTime = System.nanoTime();
             tileMap.Tick(false);
