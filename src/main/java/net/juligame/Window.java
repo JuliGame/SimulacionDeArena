@@ -166,7 +166,8 @@ public class Window {
 
     public void render() {
         if (System.currentTimeMillis() - lastFrameShowFPS > 1000) {
-            Main.debug.FPS = fps;
+            Main.debug.FPS = Profiler.getAverage("fps");
+            Profiler.addValue("fps", fps, 10000);
             lastFrameShowFPS = System.currentTimeMillis();
             fps = 0;
         }

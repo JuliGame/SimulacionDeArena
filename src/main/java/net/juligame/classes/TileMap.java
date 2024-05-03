@@ -184,54 +184,33 @@ public class TileMap {
             InitializeThings();
         }
 
-        if (ctrlZ){
-            ctrlZ = false;
-            if (!history.isEmpty()){
-                ArrayList<Particle> h = history.get(history.size() - 1);
-                history.remove(history.size() - 1);
-                for (Particle particle : h){
-                    queuedParticlesToAdd.remove(particle);
-//                    particles.remove(particle);
-                    removeParticle(particle.x, particle.y);
-//                    particle.tickNeighbours();
-                    Particle.idCounter--;
-                }
-            }
-        }
 
-        ArrayList<Particle> historial = new ArrayList<>();
-
-        if (!paused || force)
+        if (!paused || force && !queuedParticlesToAdd.isEmpty())
             alreadyAddedToTickQueue2 = new boolean[width * height];
 
-        while (!queuedParticlesToAdd.isEmpty()) {
-            Particle particle = queuedParticlesToAdd.poll();
+        if (!queuedParticlesToAdd.isEmpty()){
+            while (!queuedParticlesToAdd.isEmpty()) {
+                Particle particle = queuedParticlesToAdd.poll();
 
-            if (getTile(particle.x, particle.y) != null)
-                continue;
+                if (getTile(particle.x, particle.y) != null)
+                    continue;
 
-            if (alreadyAddedToTickQueue2[particle.x + particle.y * width])
-                continue;
+                if (alreadyAddedToTickQueue2[particle.x + particle.y * width])
+                    continue;
 
-            alreadyAddedToTickQueue2[particle.x + particle.y * width] = true;
+                alreadyAddedToTickQueue2[particle.x + particle.y * width] = true;
 
-            particle.id = Particle.idCounter++;
-            addParticle(particle);
-            AddParticleToTickQueue(particle);
-            historial.add(particle);
+                particle.id = Particle.idCounter++;
+                addParticle(particle);
+                AddParticleToTickQueue(particle);
+            }
         }
-
-
-        if (!historial.isEmpty())
-            history.add(historial);
 
 
         if (paused && !force)
             return;
 
         long startTicking = System.currentTimeMillis();
-        Main.debug.TickingParticles = subTileMaps.values().stream().mapToInt(x -> x.particlesToTick.size()).sum();
-        Main.debug.Particles = subTileMaps.values().stream().mapToInt(x -> x.particles.size()).sum();
 
         tick++;
         CalculateWindForce();
@@ -346,11 +325,16 @@ public class TileMap {
 
 
 
-        results.forEach(result -> {
-            for (Particle particleToUpdate : result.particlesToUpdate)
+        int tickingParticlesNumber = 0;
+        for (ThreadResult result : results) {
+            for (Particle particleToUpdate : result.particlesToUpdate) {
                 AddParticleToTickQueue(particleToUpdate);
-        });
+                tickingParticlesNumber++;
+            }
+        }
 
+        Main.debug.TickingParticles = tickingParticlesNumber;
+        Main.debug.Particles = subTileMaps.values().stream().mapToInt(x -> x.particles.size()).sum();
 
         for (Runnable runnable : tasksToRunOnThreadFinish)
             runnable.run();

@@ -7,7 +7,7 @@ public class Debug {
     @ShowVar(editable = false)
     public double TPS = 1;
     @ShowVar(editable = false)
-    public int FPS;
+    public double FPS;
     @ShowVar(editable = false)
     public int TickingParticles;
     @ShowVar(editable = false)
